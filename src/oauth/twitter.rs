@@ -1,5 +1,3 @@
-extern crate rocket;
-
 extern crate reqwest; 
 extern crate hmacsha1;
 extern crate base64;
