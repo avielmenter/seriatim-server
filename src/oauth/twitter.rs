@@ -3,6 +3,8 @@ extern crate hmacsha1;
 extern crate base64;
 extern crate url;
 extern crate rand;
+extern crate serde;
+extern crate serde_json;
 
 use std;
 use std::collections::HashMap;
@@ -17,12 +19,17 @@ pub struct TwitterOAuthQueryParams {
 	pub oauth_verifier: String
 }
 
-#[derive(Debug)]
 pub struct Twitter {
 	oauth_consumer_key: String,
 	oauth_consumer_secret: String,
 	oauth_token_secret: Option<String>,
 	oauth_token: Option<String>
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TwitterUser {
+	name: String,
+	screen_name: String
 }
 
 struct TwitterRequest<'a> {
@@ -65,23 +72,18 @@ impl Twitter {
 		}
 	}
 
-	fn get_token_from_response(&mut self, response: Result<String, reqwest::Error>) {
-		match response {
-			Ok (txt) => {
-				let vars = url::form_urlencoded::parse(txt.as_bytes());
-				for (key, val) in vars {
-					if key == "oauth_token" {
-						self.oauth_token = Some(val.to_string());
-					} else if key == "oauth_token_secret" {
-						self.oauth_token_secret = Some(val.to_string());
-					}
-				}
-			},
-			Err (_) => return
+	fn get_token_from_response(&mut self, response: String) {
+		let vars = url::form_urlencoded::parse(response.as_bytes());
+		for (key, val) in vars {
+			if key == "oauth_token" {
+				self.oauth_token = Some(val.to_string());
+			} else if key == "oauth_token_secret" {
+				self.oauth_token_secret = Some(val.to_string());
+			}
 		}
 	}
 
-	pub fn get_request_token(&mut self, callback: String) -> String {
+	pub fn get_redirect_url(&mut self, callback: String) -> Result<String, reqwest::Error> {
 		const REQUEST_TOKEN_URL: &'static str = "https://api.twitter.com/oauth/request_token";
 		const OAUTH_TOKEN_URL: &'static str = "https://api.twitter.com/oauth/authenticate?oauth_token=";
 
@@ -91,18 +93,18 @@ impl Twitter {
 		self.oauth_token = None;
 		self.oauth_token_secret = None;
 
-		let response : Result<String, reqwest::Error>;
+		let response: String;
 		{
 			let request = self.generate_request(reqwest::Method::Post, REQUEST_TOKEN_URL.to_string(), params, HashMap::new());
-			response = request.get_response();
+			response = request.get_response()?;
 		}
 
 		self.get_token_from_response(response);
 
-		OAUTH_TOKEN_URL.to_string() + &(if let Some(ref token) = self.oauth_token {token.clone()} else {"".to_string()})
+		Ok(OAUTH_TOKEN_URL.to_string() + &(if let Some(ref token) = self.oauth_token {token.clone()} else {"".to_string()}))
 	}
 
-	pub fn verify_request_token(&mut self, oauth_verifier: String, oauth_token: String) {
+	pub fn verify_request_token(&mut self, oauth_verifier: String, oauth_token: String) -> Result<&mut Twitter, reqwest::Error> {
 		const VERIFY_TOKEN_URL: &'static str = "https://api.twitter.com/oauth/access_token";
 
 		let mut params: HashMap<String, String> = HashMap::new();
@@ -111,13 +113,28 @@ impl Twitter {
 		self.oauth_token = Some(oauth_token);
 		self.oauth_token_secret = None;
 
-		let response : Result<String, reqwest::Error>;
+		let response: String;
 		{
 			let request = self.generate_request(reqwest::Method::Post, VERIFY_TOKEN_URL.to_string(), params, HashMap::new());
-			response = request.get_response();
+			response = request.get_response()?;
 		}
 		
 		self.get_token_from_response(response);
+		Ok(self)
+	}
+
+	pub fn verify_credentials(&self) -> Result<TwitterUser, Box<std::error::Error>> {
+		const VERIFY_CREDENTIALS_URL: &'static str = "https://api.twitter.com/1.1/account/verify_credentials.json";
+
+		let response: String;
+		{
+			let request = self.generate_request(reqwest::Method::Get, VERIFY_CREDENTIALS_URL.to_string(), HashMap::new(), HashMap::new());
+			response = request.get_response()?;
+		}
+
+		let u: TwitterUser = serde_json::from_str(&response)?;
+
+		Ok(u)
 	}
 
 	pub fn create(set_consumer_key: String, set_consumer_secret: String) -> Twitter {
@@ -227,19 +244,12 @@ impl<'a> TwitterRequest<'a> {
 	}
 
 	fn get_response(&self) -> Result<String, reqwest::Error> {
-		match self.method {
-			reqwest::Method::Post => {
-				let http_client = reqwest::Client::new();
+		let http_client = reqwest::Client::new();
 
-				println!("BODY STRING: {}", self.get_body_string());
-
-				http_client.post(&self.url)
-					.headers(self.build_auth_header())
-					.body(self.get_body_string())
-					.send()?
-					.text()
-			},
-			_ => Ok ("Not Yet Implemented".to_string())
-		}
+		http_client.request(self.method.clone(), &self.url)
+			.headers(self.build_auth_header())
+			.body(self.get_body_string())
+			.send()?
+			.text()
 	}
 }
