@@ -1,18 +1,22 @@
 #![feature(plugin, decl_macro, custom_derive)]
 #![plugin(rocket_codegen)]
 
-extern crate rocket;
-extern crate reqwest;
 extern crate dotenv;
-#[macro_use] extern crate dotenv_codegen;
-#[macro_use] extern crate serde_derive;
+extern crate reqwest;
+extern crate rocket;
+#[macro_use]
+extern crate dotenv_codegen;
+#[macro_use]
+extern crate serde_derive;
 
 mod oauth;
 use oauth::twitter;
 use oauth::twitter::Twitter;
 
 #[get("/login/twitter/callback?<oauth_params>")]
-fn twitter_callback(oauth_params: twitter::TwitterOAuthQueryParams) -> Result<String, Box<std::error::Error>> {
+fn twitter_callback(
+	oauth_params: twitter::TwitterOAuthQueryParams,
+) -> Result<String, Box<std::error::Error>> {
 	let twitter_key = dotenv!("SERIATIM_TWITTER_KEY").to_string();
 	let twitter_secret = dotenv!("SERIATIM_TWITTER_SECRET").to_string();
 
@@ -45,5 +49,7 @@ fn twitter_login() -> rocket::response::Response<'static> {
 }
 
 fn main() {
-	rocket::ignite().mount("/", routes![twitter_login, twitter_callback]).launch();
+	rocket::ignite()
+		.mount("/", routes![twitter_login, twitter_callback])
+		.launch();
 }
