@@ -9,6 +9,8 @@ extern crate url;
 use std;
 use std::collections::HashMap;
 
+use data::schema::users;
+
 const NONCE_LENGTH: u32 = 32;
 const OAUTH_VERSION: &'static str = "1.0";
 const OAUTH_SIGNATURE_METHOD: &'static str = "HMAC-SHA1";
@@ -26,10 +28,13 @@ pub struct Twitter {
 	oauth_token: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Insertable, Debug)]
+#[table_name = "users"]
 pub struct TwitterUser {
-	name: String,
-	screen_name: String,
+	#[column_name = "twitter_name"]
+	pub name: String,
+	#[column_name = "twitter_screen_name"]
+	pub screen_name: String,
 }
 
 struct TwitterRequest<'a> {
@@ -226,8 +231,10 @@ impl<'a> TwitterRequest<'a> {
 			acc + ampersand + key + "=" + val
 		});
 
-		let unhashed = TwitterRequest::get_http_method_string(&self.method) + "&"
-			+ &TwitterRequest::url_encode(&self.url) + "&"
+		let unhashed = TwitterRequest::get_http_method_string(&self.method)
+			+ "&"
+			+ &TwitterRequest::url_encode(&self.url)
+			+ "&"
 			+ &TwitterRequest::url_encode(&encoded_params);
 
 		let mut secret = "".to_string();
