@@ -1,4 +1,4 @@
-#![feature(plugin, decl_macro, custom_derive)]
+#![feature(plugin, decl_macro, custom_derive, custom_attribute)]
 #![plugin(rocket_codegen)]
 
 extern crate dotenv;
@@ -40,8 +40,8 @@ fn twitter_callback(
 		Err(_) => User::create_from_twitter(&con, &twitter_user),
 	}?;
 
-	cookies.add_private(Cookie::new("user_id", db_user.user_id.to_string()));
-	Ok(format!("{:?}", db_user))
+	cookies.add_private(Cookie::new("user_id", db_user.data.id.to_string()));
+	Ok(format!("{:?}", db_user.data))
 }
 
 #[get("/login/twitter")]
@@ -67,10 +67,10 @@ fn twitter_login() -> rocket::response::Response<'static> {
 
 #[get("/document/<doc_id>")]
 fn get_document(doc_id: String, user: UserID, con: Connection) -> String {
-	let doc = data::document::Document::get_by_document_id(&con, &doc_id);
+	let doc = data::document::Document::get_by_id(&con, &uuid::Uuid::parse_str(&doc_id).unwrap());
 
 	match doc {
-		Ok(d) => format!("Document found! ID: {}", d.document_id.hyphenated()),
+		Ok(d) => format!("Document found! ID: {}", d.data.id.hyphenated()),
 		Err(e) => format!("Error finding document: {:?}", e),
 	}
 }

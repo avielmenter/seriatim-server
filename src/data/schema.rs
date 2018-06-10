@@ -1,6 +1,6 @@
 table! {
-    documents (document_id) {
-        document_id -> Uuid,
+    documents (id) {
+        id -> Uuid,
         user_id -> Uuid,
         root_item_id -> Nullable<Uuid>,
         created_at -> Timestamp,
@@ -9,18 +9,18 @@ table! {
 }
 
 table! {
-    items (item_id) {
-        item_id -> Uuid,
+    items (id) {
+        id -> Uuid,
         document_id -> Uuid,
         parent_id -> Nullable<Uuid>,
         item_text -> Text,
-        collapsed -> Nullable<Bool>,
+        collapsed -> Bool,
     }
 }
 
 table! {
-    users (user_id) {
-        user_id -> Uuid,
+    users (id) {
+        id -> Uuid,
         twitter_name -> Nullable<Text>,
         twitter_screen_name -> Nullable<Text>,
     }
