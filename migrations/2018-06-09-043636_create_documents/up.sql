@@ -10,8 +10,8 @@ CREATE TABLE documents (
 
 CREATE TABLE items (
 	id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
-	document_id uuid NOT NULL REFERENCES documents,
-	parent_id uuid NULL REFERENCES items,
+	document_id uuid NOT NULL REFERENCES documents ON DELETE CASCADE,
+	parent_id uuid NULL REFERENCES items ON DELETE CASCADE,
 	item_text TEXT NOT NULL,
 	collapsed BOOLEAN NOT NULL DEFAULT FALSE
 );

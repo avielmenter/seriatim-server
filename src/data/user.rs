@@ -1,50 +1,19 @@
-use rocket::outcome::IntoOutcome;
-use rocket::request::{self, FromRequest, Request};
-
-use diesel;
-use diesel::prelude::*;
-
+use data;
 use data::db::Connection;
 use data::schema::users;
 use data::schema::users::dsl::*;
 
+use diesel;
+use diesel::prelude::*;
+
 use oauth::twitter::TwitterUser;
+
+use serde::ser::{Serialize, SerializeStruct, Serializer};
 
 use uuid;
 
-#[derive(Debug)]
-pub struct UserID {
-	pub uuid: uuid::Uuid,
-}
-
-impl UserID {
-	pub fn from_string(uuid_str: &str) -> Result<UserID, uuid::ParseError> {
-		let uuid = uuid::Uuid::parse_str(uuid_str)?;
-		Ok(UserID { uuid })
-	}
-
-	pub fn to_string(self: &UserID) -> String {
-		format!("{}", self.uuid.hyphenated())
-	}
-}
-
-#[derive(Debug)]
-pub enum Error {
-	UserNotFound,
-}
-
-impl<'a, 'r> FromRequest<'a, 'r> for UserID {
-	type Error = Error;
-
-	fn from_request(request: &'a Request<'r>) -> request::Outcome<UserID, Error> {
-		request
-			.cookies()
-			.get_private("user_id")
-			.and_then(|c_user_id| UserID::from_string(c_user_id.value()).ok())
-			.and_then(|uuid| Some(uuid))
-			.or_forward(())
-	}
-}
+#[derive(TaggedID)]
+pub struct UserID(uuid::Uuid);
 
 pub struct User<'a> {
 	connection: &'a Connection,
@@ -54,15 +23,21 @@ pub struct User<'a> {
 #[derive(Debug, Queryable, Identifiable)]
 #[table_name = "users"]
 pub struct Data {
-	pub id: uuid::Uuid,
+	id: uuid::Uuid,
 	pub twitter_name: Option<String>,
 	pub twitter_screen_name: Option<String>,
 }
 
 impl<'a> User<'a> {
+	pub fn get_id(&self) -> UserID {
+		UserID(self.data.id.clone())
+	}
+
 	pub fn get_by_id(connection: &'a Connection, p_user_id: &UserID) -> QueryResult<User<'a>> {
+		let p_uuid = **p_user_id;
+
 		let data = users
-			.filter(id.eq(&p_user_id.uuid))
+			.filter(id.eq(&p_uuid))
 			.first::<Data>(&connection.pg_connection)?;
 
 		Ok(User { connection, data })
@@ -90,7 +65,25 @@ impl<'a> User<'a> {
 		Ok(User { connection, data })
 	}
 
-	pub fn get_documents(self: &User<'a>) -> QueryResult<Vec<super::document::Document<'a>>> {
-		super::document::Document::get_by_user(self.connection, &self.data.id)
+	pub fn get_documents(self: &User<'a>) -> QueryResult<Vec<data::document::Document<'a>>> {
+		data::document::Document::get_by_user(self.connection, &self.get_id())
+	}
+
+	pub fn create_document(&self) -> QueryResult<data::document::Document> {
+		data::document::Document::create_for_user(&self.connection, &self.get_id())
+	}
+}
+
+impl<'a> Serialize for User<'a> {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: Serializer,
+	{
+		let mut serialized = serializer.serialize_struct("Document", 3)?;
+		serialized.serialize_field("user_id", &self.get_id())?;
+		serialized.serialize_field("twitter_name", &self.data.twitter_name)?;
+		serialized.serialize_field("twitter_screen_name", &self.data.twitter_screen_name)?;
+
+		serialized.end()
 	}
 }
