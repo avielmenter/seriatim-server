@@ -5,19 +5,48 @@ use oauth::twitter;
 use oauth::twitter::Twitter;
 
 use rocket;
-use rocket::http::Cookies;
+use rocket::http::{Cookie, Cookies};
+use rocket::outcome::IntoOutcome;
+use rocket::request::{FromRequest, Outcome, Request};
+use rocket::response::{Flash, Response};
 use rocket::Route;
 
-use rocket_contrib::JsonValue;
+use routes::io::redirect_response;
 
 use std;
+
+const RETURN_URL_COOKIE: &'static str = "redirect_url";
+
+#[derive(FromForm)]
+struct ReturnURL {
+	url: String,
+}
+
+impl<'a, 'r> FromRequest<'a, 'r> for ReturnURL {
+	type Error = ();
+
+	fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
+		request
+			.cookies()
+			.get(RETURN_URL_COOKIE)
+			.and_then(|c| {
+				println!("FOUND COOKIE");
+
+				Some(ReturnURL {
+					url: c.value().to_string(),
+				})
+			})
+			.or_forward(())
+	}
+}
 
 #[get("/twitter/callback?<oauth_params>")]
 fn twitter_callback(
 	oauth_params: twitter::TwitterOAuthQueryParams,
+	redirect: ReturnURL,
 	mut cookies: Cookies,
 	con: Connection,
-) -> Result<JsonValue, Box<std::error::Error>> {
+) -> Result<Flash<Response>, Box<std::error::Error>> {
 	let twitter_key = dotenv!("SERIATIM_TWITTER_KEY").to_string();
 	let twitter_secret = dotenv!("SERIATIM_TWITTER_SECRET").to_string();
 
@@ -33,16 +62,14 @@ fn twitter_callback(
 	let user_id = db_user.get_id();
 
 	cookies.add_private(user_id.to_cookie());
-
-	Ok(json!({
-		"id": user_id,
-		"twitter_name": twitter_user.name,
-		"twitter_screen_name": twitter_user.screen_name
-	}))
+	Ok(Flash::success(
+		redirect_response(redirect.url),
+		"Login successful!",
+	))
 }
 
-#[get("/twitter")]
-fn twitter_login() -> rocket::response::Response<'static> {
+#[get("/twitter?<redirect>")]
+fn twitter_login(redirect: ReturnURL, mut cookies: Cookies) -> Response {
 	let callback = dotenv!("SERIATIM_DOMAIN").to_string() + &"login/twitter/callback".to_string();
 	let twitter_key = dotenv!("SERIATIM_TWITTER_KEY").to_string();
 	let twitter_secret = dotenv!("SERIATIM_TWITTER_SECRET").to_string();
@@ -51,10 +78,10 @@ fn twitter_login() -> rocket::response::Response<'static> {
 	let oauth_url = auth.get_redirect_url(callback);
 
 	if let Ok(redirect_url) = oauth_url {
-		rocket::response::Response::build()
-			.status(rocket::http::Status::Found)
-			.raw_header("Location", redirect_url)
-			.finalize()
+		println!("ADDING RETURN URL COOKIE: {}", redirect.url);
+		cookies.add(Cookie::new(RETURN_URL_COOKIE, redirect.url));
+
+		redirect_response(redirect_url)
 	} else {
 		rocket::response::Response::build()
 			.status(rocket::http::Status::InternalServerError)
