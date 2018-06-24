@@ -5,6 +5,7 @@ use data::user;
 use routes::error::Error;
 use routes::io::{send_success, SeriatimResult};
 
+use rocket;
 use rocket::Route;
 use rocket_contrib::Json;
 
@@ -33,12 +34,24 @@ fn delete_document(
 	Ok(send_success(&doc))
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct RenameDocumentParams {
 	name: String,
 }
 
-#[post("/<doc_id>/rename", format = "application/json", data = "<rename>")]
+#[route(OPTIONS, "/<doc_id>/rename")]
+fn rename_options<'a>(doc_id: DocumentID) -> rocket::response::Response<'a> {
+	rocket::response::Response::build()
+		.raw_header(
+			"Access-Control-Allow-Origin",
+			dotenv!("SERIATIM_ALLOWED_ORIGIN"),
+		)
+		.raw_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		.raw_header("Access-Control-Allow-Headers", "Content-Type")
+		.finalize()
+}
+
+#[post("/<doc_id>/rename", format = "json", data = "<rename>")]
 fn rename_document(
 	doc_id: DocumentID,
 	rename: Json<RenameDocumentParams>,
@@ -50,7 +63,7 @@ fn rename_document(
 		return Err(Error::InsufficientPermissions);
 	}
 
-	doc.rename(&rename.name)?;
+	doc.rename(&rename.0.name)?;
 	Ok(send_success(&doc))
 }
 
@@ -84,6 +97,7 @@ pub fn routes() -> Vec<Route> {
 		create_document,
 		delete_document,
 		rename_document,
+		rename_options,
 		get_document,
 		not_logged_in_get,
 		not_logged_in_post,
