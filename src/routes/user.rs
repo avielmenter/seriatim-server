@@ -4,7 +4,10 @@ use data::user::User;
 
 use rocket::Route;
 
+use routes::error::Error;
 use routes::io::{send_success, SeriatimResult};
+
+use std;
 
 #[get("/current")]
 fn current_user(connection: Connection, user_id: user::UserID) -> SeriatimResult {
@@ -20,6 +23,11 @@ fn list_documents(connection: Connection, user_id: user::UserID) -> SeriatimResu
 	Ok(send_success(&docs))
 }
 
+#[get("/<path..>")]
+fn not_logged_in(path: std::path::PathBuf) -> SeriatimResult {
+	Err(Error::NotLoggedIn)
+}
+
 pub fn routes() -> Vec<Route> {
-	routes![current_user, list_documents]
+	routes![current_user, list_documents, not_logged_in]
 }

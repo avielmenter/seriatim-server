@@ -18,6 +18,7 @@ extern crate seriatim_codegen;
 extern crate serde;
 extern crate serde_json;
 
+mod cors;
 mod data;
 mod oauth;
 mod routes;
@@ -32,5 +33,6 @@ fn main() {
 		.mount("/document", document_routes)
 		.mount("/login", login_routes)
 		.mount("/user", user_routes)
+		.attach(cors::CORS())
 		.launch();
 }

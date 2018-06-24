@@ -8,7 +8,9 @@ use routes::io::{send_success, SeriatimResult};
 use rocket::Route;
 use rocket_contrib::Json;
 
-#[get("/create")]
+use std::path::PathBuf;
+
+#[post("/create")]
 fn create_document(connection: Connection, user_id: user::UserID) -> SeriatimResult {
 	let u = user::User::get_by_id(&connection, &user_id)?;
 	let doc = u.create_document()?;
@@ -16,7 +18,7 @@ fn create_document(connection: Connection, user_id: user::UserID) -> SeriatimRes
 	Ok(send_success(&doc.serialize_with_items()?))
 }
 
-#[delete("/<doc_id>/delete")]
+#[post("/<doc_id>/delete")]
 fn delete_document(
 	doc_id: DocumentID,
 	connection: Connection,
@@ -67,11 +69,23 @@ fn get_document(
 	}
 }
 
+#[get("/<_path..>", rank = 2)]
+fn not_logged_in_get(_path: PathBuf) -> SeriatimResult {
+	Err(Error::NotLoggedIn)
+}
+
+#[post("/<_path..>", rank = 2)]
+fn not_logged_in_post(_path: PathBuf) -> SeriatimResult {
+	Err(Error::NotLoggedIn)
+}
+
 pub fn routes() -> Vec<Route> {
 	routes![
 		create_document,
 		delete_document,
 		rename_document,
-		get_document
+		get_document,
+		not_logged_in_get,
+		not_logged_in_post,
 	]
 }
