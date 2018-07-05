@@ -1,2 +1,1 @@
 VERSION=nightly-2018-06-05
-BUILD_PATH=./target/release
