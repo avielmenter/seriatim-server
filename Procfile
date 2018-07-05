@@ -1,1 +1,1 @@
-web: $BUILD_DIR/$BUILD_PATH/target/release/seriatm-server
+web: ./target/release/seriatm-server
