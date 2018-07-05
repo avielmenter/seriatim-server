@@ -30,5 +30,6 @@ pub fn cors_response<'a>() -> rocket::response::Response<'a> {
 		)
 		.raw_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 		.raw_header("Access-Control-Allow-Headers", "Content-Type")
+		.raw_header("Access-Control-Allow-Credentials", "true")
 		.finalize()
 }

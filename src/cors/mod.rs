@@ -21,11 +21,6 @@ impl Fairing for CORS {
 	fn on_response(&self, request: &Request, response: &mut Response) {
 		if request.method() == Method::Options || response.content_type() == Some(ContentType::JSON)
 		{
-			println!(
-				"ALLOWED ORIGIN: {}",
-				env::var("SERIATIM_ALLOWED_ORIGIN").unwrap()
-			);
-
 			response.set_header(Header::new(
 				"Access-Control-Allow-Origin",
 				env::var("SERIATIM_ALLOWED_ORIGIN").unwrap(),
