@@ -22,12 +22,26 @@ mod data;
 mod oauth;
 mod routes;
 
+use std::env;
+
 fn main() {
 	dotenv::dotenv().ok();
 
 	let login_routes = routes::login::routes();
 	let document_routes = routes::document::routes();
 	let user_routes = routes::user::routes();
+
+	println!("DOMAIN: {}", env::var("SERIATIM_DOMAIN").unwrap());
+
+	println!(
+		"ALLOWED ORIGIN: {}",
+		env::var("SERIATIM_ALLOWED_ORIGIN").unwrap()
+	);
+
+	println!(
+		"SESSION DOMAIN: {}",
+		env::var("SERIATIM_SESSION_DOMAIN").unwrap()
+	);
 
 	rocket::ignite()
 		.manage(data::db::init_pool())
