@@ -1,1 +1,1 @@
-web: ./target/debug/seriatm-server
+web: cargo run
