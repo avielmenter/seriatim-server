@@ -1,1 +1,1 @@
-web: ./target/release/seriatm-server
+web: ./target/release/seriatim-server
