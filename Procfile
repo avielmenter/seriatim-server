@@ -1,1 +1,1 @@
-web: ./target/rls/seriatm-server
+web: ./target/release/seriatm-server
