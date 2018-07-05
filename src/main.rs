@@ -1,7 +1,6 @@
 #![feature(plugin, decl_macro, custom_derive, custom_attribute, associated_type_defaults)]
 #![plugin(rocket_codegen)]
 
-extern crate cookie;
 extern crate dotenv;
 extern crate reqwest;
 extern crate rocket;
