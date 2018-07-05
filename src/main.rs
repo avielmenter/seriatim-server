@@ -10,11 +10,12 @@ extern crate rocket_contrib;
 extern crate serde_derive;
 #[macro_use]
 extern crate diesel;
+extern crate serde;
+extern crate serde_json;
+extern crate url;
 extern crate uuid;
 #[macro_use]
 extern crate seriatim_codegen;
-extern crate serde;
-extern crate serde_json;
 
 mod cors;
 mod data;

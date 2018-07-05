@@ -2,12 +2,13 @@ extern crate base64;
 extern crate hmacsha1;
 extern crate rand;
 extern crate reqwest;
-extern crate url;
 
 use serde_json;
 
 use std;
 use std::collections::HashMap;
+
+use url;
 
 use data::schema::users;
 
