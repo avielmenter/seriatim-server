@@ -4,6 +4,8 @@
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::{ContentType, Header, Method};
 use rocket::{Request, Response};
+
+use std::env;
 use std::io::Cursor;
 
 pub struct CORS();
@@ -21,7 +23,7 @@ impl Fairing for CORS {
 		{
 			response.set_header(Header::new(
 				"Access-Control-Allow-Origin",
-				dotenv!("SERIATIM_ALLOWED_ORIGIN"),
+				env::var("SERIATIM_ALLOWED_ORIGIN").unwrap(),
 			));
 			response.set_header(Header::new(
 				"Access-Control-Allow-Methods",

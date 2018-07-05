@@ -1,7 +1,10 @@
 use rocket;
 use rocket_contrib::JsonValue;
 use routes::error::Error;
+
 use serde::ser::Serialize;
+
+use std::env;
 
 pub type SeriatimResult = Result<JsonValue, Error>;
 
@@ -23,7 +26,7 @@ pub fn cors_response<'a>() -> rocket::response::Response<'a> {
 	rocket::response::Response::build()
 		.raw_header(
 			"Access-Control-Allow-Origin",
-			dotenv!("SERIATIM_ALLOWED_ORIGIN"),
+			env::var("SERIATIM_ALLOWED_ORIGIN").unwrap(),
 		)
 		.raw_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 		.raw_header("Access-Control-Allow-Headers", "Content-Type")

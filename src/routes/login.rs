@@ -14,6 +14,7 @@ use rocket::Route;
 use routes::io::redirect_response;
 
 use std;
+use std::env;
 
 const RETURN_URL_COOKIE: &'static str = "redirect_url";
 
@@ -45,8 +46,8 @@ fn twitter_callback(
 	mut cookies: Cookies,
 	con: Connection,
 ) -> Result<Flash<Response>, Box<std::error::Error>> {
-	let twitter_key = dotenv!("SERIATIM_TWITTER_KEY").to_string();
-	let twitter_secret = dotenv!("SERIATIM_TWITTER_SECRET").to_string();
+	let twitter_key = env::var("SERIATIM_TWITTER_KEY").unwrap();
+	let twitter_secret = env::var("SERIATIM_TWITTER_SECRET").unwrap();
 
 	let twitter_user = Twitter::create(twitter_key, twitter_secret)
 		.verify_request_token(oauth_params.oauth_verifier, oauth_params.oauth_token)?
@@ -68,9 +69,9 @@ fn twitter_callback(
 
 #[get("/twitter?<redirect>")]
 fn twitter_login(redirect: ReturnURL, mut cookies: Cookies) -> Response {
-	let callback = dotenv!("SERIATIM_DOMAIN").to_string() + &"login/twitter/callback".to_string();
-	let twitter_key = dotenv!("SERIATIM_TWITTER_KEY").to_string();
-	let twitter_secret = dotenv!("SERIATIM_TWITTER_SECRET").to_string();
+	let callback = env::var("SERIATIM_DOMAIN").unwrap() + &"login/twitter/callback".to_string();
+	let twitter_key = env::var("SERIATIM_TWITTER_KEY").unwrap();
+	let twitter_secret = env::var("SERIATIM_TWITTER_SECRET").unwrap();
 
 	let mut auth = Twitter::create(twitter_key, twitter_secret);
 	let oauth_url = auth.get_redirect_url(callback);

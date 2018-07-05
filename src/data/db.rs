@@ -5,12 +5,12 @@ use rocket::http::Status;
 use rocket::request::{self, FromRequest};
 use rocket::{Outcome, Request, State};
 
+use std::env;
+
 type PgPool = Pool<ConnectionManager<PgConnection>>;
 
-static DB_URL: &'static str = dotenv!("DATABASE_URL");
-
 pub fn init_pool() -> PgPool {
-	let manager = ConnectionManager::<PgConnection>::new(DB_URL);
+	let manager = ConnectionManager::<PgConnection>::new(env::var("DATABASE_URL").unwrap());
 	Pool::new(manager).expect("Could not connect to database")
 }
 
