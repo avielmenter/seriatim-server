@@ -14,6 +14,7 @@ table! {
         document_id -> Uuid,
         parent_id -> Nullable<Uuid>,
         item_text -> Text,
+        child_order -> Int4,
         collapsed -> Bool,
     }
 }

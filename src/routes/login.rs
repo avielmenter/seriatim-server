@@ -30,8 +30,6 @@ impl<'a, 'r> FromRequest<'a, 'r> for ReturnURL {
 			.cookies()
 			.get(RETURN_URL_COOKIE)
 			.and_then(|c| {
-				println!("FOUND COOKIE");
-
 				Some(ReturnURL {
 					url: c.value().to_string(),
 				})
@@ -78,7 +76,6 @@ fn twitter_login(redirect: ReturnURL, mut cookies: Cookies) -> Response {
 	let oauth_url = auth.get_redirect_url(callback);
 
 	if let Ok(redirect_url) = oauth_url {
-		println!("ADDING RETURN URL COOKIE: {}", redirect.url);
 		cookies.add(Cookie::new(RETURN_URL_COOKIE, redirect.url));
 
 		redirect_response(redirect_url)

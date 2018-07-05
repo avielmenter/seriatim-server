@@ -18,3 +18,14 @@ pub fn redirect_response(url: String) -> rocket::response::Response<'static> {
 		.raw_header("Location", url)
 		.finalize()
 }
+
+pub fn cors_response<'a>() -> rocket::response::Response<'a> {
+	rocket::response::Response::build()
+		.raw_header(
+			"Access-Control-Allow-Origin",
+			dotenv!("SERIATIM_ALLOWED_ORIGIN"),
+		)
+		.raw_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+		.raw_header("Access-Control-Allow-Headers", "Content-Type")
+		.finalize()
+}

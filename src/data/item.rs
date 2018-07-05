@@ -25,6 +25,7 @@ pub struct Data {
 	pub document_id: uuid::Uuid,
 	pub parent_id: Option<uuid::Uuid>,
 	pub item_text: String,
+	pub child_order: i32,
 	pub collapsed: bool,
 }
 
@@ -35,6 +36,13 @@ impl<'a> Item<'a> {
 
 	pub fn get_id(&self) -> ItemID {
 		ItemID::from_uuid(self.data.id.clone())
+	}
+
+	pub fn get_parent_id(&self) -> Option<ItemID> {
+		match self.data.parent_id {
+			None => None,
+			Some(pid) => Some(ItemID(pid)),
+		}
 	}
 
 	fn results_list(
@@ -69,6 +77,16 @@ impl<'a> Item<'a> {
 
 		Self::results_list(connection, items_list)
 	}
+
+	pub fn remove(&mut self) -> QueryResult<usize> {
+		let p_item_uuid = self.get_id();
+
+		diesel::delete(items)
+			.filter(id.eq(&*p_item_uuid))
+			.execute(&self.connection.pg_connection)
+	}
+
+	/* NOT USED
 
 	pub fn get_from_parent(
 		connection: &'a Connection,
@@ -118,9 +136,9 @@ impl<'a> Item<'a> {
 		}
 
 		Ok(Item { connection, data })
-	}
+	} // */
 
-	pub fn update_item_text(&mut self, update_text: &str) -> QueryResult<&mut Item<'a>> {
+	pub fn update_text(&mut self, update_text: &str) -> QueryResult<&mut Item<'a>> {
 		let data = diesel::update(items)
 			.filter(id.eq(self.data.id))
 			.set(item_text.eq(update_text))
@@ -137,7 +155,7 @@ impl<'a> Serialize for Item<'a> {
 	where
 		S: Serializer,
 	{
-		let mut serialized = serializer.serialize_struct("Item", 5)?;
+		let mut serialized = serializer.serialize_struct("Item", 6)?;
 		serialized.serialize_field("item_id", &self.get_id())?;
 
 		serialized.serialize_field(
@@ -154,6 +172,7 @@ impl<'a> Serialize for Item<'a> {
 		)?;
 
 		serialized.serialize_field("text", &self.data.item_text)?;
+		serialized.serialize_field("child_order", &self.data.child_order)?;
 		serialized.serialize_field("collapsed", &self.data.collapsed)?;
 
 		serialized.end()

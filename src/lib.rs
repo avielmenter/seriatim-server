@@ -26,6 +26,11 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> quote::Tokens {
 			pub fn to_cookie(&self) -> rocket::http::Cookie<'static> {
 				rocket::http::Cookie::new(Self::cookie_name(), self.0.hyphenated().to_string())
 			}
+
+			#[allow(dead_code)]
+			pub fn json_str(&self) -> String {
+				self.0.hyphenated().to_string()
+			}
 		}
 
 		impl<'a, 'r> rocket::request::FromRequest<'a, 'r> for #name {

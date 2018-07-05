@@ -13,7 +13,9 @@ CREATE TABLE items (
 	document_id uuid NOT NULL REFERENCES documents ON DELETE CASCADE,
 	parent_id uuid NULL REFERENCES items ON DELETE CASCADE,
 	item_text TEXT NOT NULL,
-	collapsed BOOLEAN NOT NULL DEFAULT FALSE
+	child_order INT NOT NULL,
+	collapsed BOOLEAN NOT NULL DEFAULT FALSE,
+	UNIQUE(child_order, parent_id)
 );
 
 ALTER TABLE documents

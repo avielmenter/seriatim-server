@@ -23,8 +23,8 @@ fn list_documents(connection: Connection, user_id: user::UserID) -> SeriatimResu
 	Ok(send_success(&docs))
 }
 
-#[get("/<path..>")]
-fn not_logged_in(path: std::path::PathBuf) -> SeriatimResult {
+#[get("/<_path..>")]
+fn not_logged_in(_path: std::path::PathBuf) -> SeriatimResult {
 	Err(Error::NotLoggedIn)
 }
 

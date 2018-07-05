@@ -52,6 +52,7 @@ struct NewItem<'a> {
 	document_id: uuid::Uuid,
 	parent_id: Option<uuid::Uuid>,
 	item_text: &'a str,
+	child_order: i32,
 	collapsed: bool,
 }
 
@@ -73,7 +74,7 @@ impl<'a> Document<'a> {
 		Ok(Document { connection, data })
 	}
 
-	pub fn add_item(&mut self, p_parent_id: Option<ItemID>) -> QueryResult<Item> {
+	pub fn add_item(&mut self, p_parent_id: Option<ItemID>, p_order: i32) -> QueryResult<Item> {
 		let insert_item = NewItem {
 			document_id: *self.get_id(),
 			parent_id: match p_parent_id {
@@ -81,6 +82,7 @@ impl<'a> Document<'a> {
 				None => None,
 			},
 			item_text: "",
+			child_order: p_order,
 			collapsed: false,
 		};
 
@@ -105,7 +107,7 @@ impl<'a> Document<'a> {
 
 		let mut doc = Document { connection, data };
 		let doc_id = doc.data.id.clone();
-		let root_item = doc.add_item(None)?;
+		let root_item = doc.add_item(None, 0)?;
 
 		let rooted_data = diesel::update(documents)
 			.filter(data::schema::documents::dsl::id.eq(&doc_id))
@@ -165,7 +167,7 @@ impl<'a> Document<'a> {
 
 	pub fn rename(&mut self, update_text: &str) -> QueryResult<()> {
 		let mut root_item = self.get_root()?;
-		root_item.update_item_text(update_text)?;
+		root_item.update_text(update_text)?;
 
 		Ok(())
 	}

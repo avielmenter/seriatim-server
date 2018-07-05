@@ -25,7 +25,7 @@ impl Fairing for CORS {
 			));
 			response.set_header(Header::new(
 				"Access-Control-Allow-Methods",
-				"POST, GET, OPTIONS",
+				"POST, GET, DELETE, OPTIONS",
 			));
 			response.set_header(Header::new("Access-Control-Allow-Headers", "Content-Type"));
 			response.set_header(Header::new("Access-Control-Allow-Credentials", "true"));
