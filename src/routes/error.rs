@@ -6,6 +6,8 @@ use rocket::response::{self, Responder, Response};
 
 use std;
 
+use uuid::ParseError;
+
 #[derive(Debug)]
 pub enum Error {
 	InsufficientPermissions,
@@ -61,3 +63,5 @@ impl<E: std::error::Error + NotSeriatimError + 'static> std::convert::From<E> fo
 		Error::OtherError(Box::new(error))
 	}
 }
+
+impl NotSeriatimError for ParseError {}

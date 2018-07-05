@@ -74,14 +74,19 @@ impl<'a> Document<'a> {
 		Ok(Document { connection, data })
 	}
 
-	pub fn add_item(&mut self, p_parent_id: Option<ItemID>, p_order: i32) -> QueryResult<Item> {
+	pub fn add_item(
+		&mut self,
+		p_parent_id: Option<ItemID>,
+		p_order: i32,
+		text: Option<String>,
+	) -> QueryResult<Item> {
 		let insert_item = NewItem {
 			document_id: *self.get_id(),
 			parent_id: match p_parent_id {
 				Some(pid) => Some(*pid),
 				None => None,
 			},
-			item_text: "",
+			item_text: &text.unwrap_or("".to_string()),
 			child_order: p_order,
 			collapsed: false,
 		};
@@ -107,7 +112,7 @@ impl<'a> Document<'a> {
 
 		let mut doc = Document { connection, data };
 		let doc_id = doc.data.id.clone();
-		let root_item = doc.add_item(None, 0)?;
+		let root_item = doc.add_item(None, 0, None)?;
 
 		let rooted_data = diesel::update(documents)
 			.filter(data::schema::documents::dsl::id.eq(&doc_id))
@@ -150,6 +155,15 @@ impl<'a> Document<'a> {
 
 	pub fn get_items(self: &Document<'a>) -> QueryResult<Vec<super::item::Item<'a>>> {
 		super::item::Item::get_by_document(self.connection, &self.get_id())
+	}
+
+	pub fn get_item(&self, p_item_id: &ItemID) -> QueryResult<Item> {
+		let data = items
+			.filter(document_id.eq(&*self.get_id()))
+			.filter(data::schema::items::dsl::id.eq(&**p_item_id))
+			.first::<super::item::Data>(&self.connection.pg_connection)?;
+
+		Ok(Item::new(&self.connection, data))
 	}
 
 	pub fn get_root(&self) -> QueryResult<Item> {

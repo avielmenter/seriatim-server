@@ -38,13 +38,6 @@ impl<'a> Item<'a> {
 		ItemID::from_uuid(self.data.id.clone())
 	}
 
-	pub fn get_parent_id(&self) -> Option<ItemID> {
-		match self.data.parent_id {
-			None => None,
-			Some(pid) => Some(ItemID(pid)),
-		}
-	}
-
 	fn results_list(
 		connection: &'a Connection,
 		items_list: Vec<Data>,
@@ -78,65 +71,13 @@ impl<'a> Item<'a> {
 		Self::results_list(connection, items_list)
 	}
 
-	pub fn remove(&mut self) -> QueryResult<usize> {
+	pub fn remove_children(&mut self) -> QueryResult<usize> {
 		let p_item_uuid = self.get_id();
 
 		diesel::delete(items)
-			.filter(id.eq(&*p_item_uuid))
+			.filter(parent_id.eq(&*p_item_uuid))
 			.execute(&self.connection.pg_connection)
 	}
-
-	/* NOT USED
-
-	pub fn get_from_parent(
-		connection: &'a Connection,
-		p_parent_id: &ItemID,
-	) -> QueryResult<Vec<Item<'a>>> {
-		let p_parent_uuid = **p_parent_id;
-
-		let items_list = items
-			.filter(parent_id.eq(&p_parent_uuid))
-			.load::<Data>(&connection.pg_connection)?;
-
-		Self::results_list(connection, items_list)
-	}
-
-	pub fn get_children(self: &Item<'a>) -> QueryResult<Vec<Item<'a>>> {
-		Self::get_from_parent(self.connection, &self.get_id())
-	}
-
-	pub fn remove_item(connection: &'a Connection, p_item_id: &ItemID) -> QueryResult<usize> {
-		let p_item_uuid = **p_item_id;
-
-		diesel::delete(items)
-			.filter(id.eq(&p_item_uuid))
-			.execute(&connection.pg_connection)
-	}
-
-	pub fn update_item(
-		connection: &'a Connection,
-		p_item: &Item,
-		children: &[ItemID],
-	) -> QueryResult<Item<'a>> {
-		let data = diesel::update(items)
-			.filter(id.eq(&*p_item.get_id()))
-			.set((
-				parent_id.eq(p_item.data.parent_id),
-				collapsed.eq(p_item.data.collapsed),
-			))
-			.get_result(&connection.pg_connection)?;
-
-		let db_children = p_item.get_children()?;
-
-		for db_child in db_children {
-			// remove items in database that are no longer children of this item
-			if !children.iter().any(|c| c.eq(&db_child.get_id())) {
-				Self::remove_item(connection, &db_child.get_id())?;
-			}
-		}
-
-		Ok(Item { connection, data })
-	} // */
 
 	pub fn update_text(&mut self, update_text: &str) -> QueryResult<&mut Item<'a>> {
 		let data = diesel::update(items)

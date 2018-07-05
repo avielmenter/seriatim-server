@@ -1,6 +1,6 @@
 use data::db::Connection;
 use data::document::{Document, DocumentID};
-use data::item::{Item, ItemID};
+use data::item::ItemID;
 use data::user;
 
 use diesel::result::QueryResult;
@@ -91,6 +91,7 @@ struct EditDocumentItem {
 	parent_id: Option<String>,
 	child_order: i32,
 	children: Vec<String>,
+	item_text: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -104,50 +105,8 @@ fn edit_options<'a>(_doc_id: DocumentID) -> rocket::response::Response<'a> {
 	cors_response::<'a>()
 }
 
-fn get_existing_items<'a>(doc: &Document<'a>) -> QueryResult<HashMap<ItemID, Item<'a>>> {
-	let existing_items = doc
-		.get_items()?
-		.into_iter()
-		.map(|i| (i.get_id(), i))
-		.collect::<HashMap<ItemID, Item>>();
-
-	Ok(existing_items)
-}
-
-fn remove_children<'a>(
-	doc: &Document<'a>,
-	existing_items: &mut HashMap<ItemID, Item<'a>>,
-	children: &Vec<String>,
-	curr: &str,
-) -> QueryResult<()> {
-	let mut items_to_remove = Vec::<ItemID>::new();
-
-	for (existing_id, existing_item) in existing_items.iter_mut() {
-		// remove nonexistent children
-		let parent_id = existing_item.get_parent_id();
-
-		if parent_id.is_some()
-			&& parent_id.unwrap().json_str() == curr
-			&& !children.contains(&existing_id.json_str())
-		{
-			existing_item.remove()?;
-			items_to_remove.push(existing_item.get_id());
-		}
-	}
-
-	if items_to_remove.len() > 0 {
-		let updated_items = get_existing_items(&doc)?; // we need to refresh existing items from the database because removing an item could cause cascading deletes
-
-		existing_items.clear();
-		existing_items.extend(updated_items);
-	}
-
-	Ok(())
-}
-
 fn merge_edit_subtree<'a>(
 	doc: &mut Document<'a>,
-	existing_items: &mut HashMap<ItemID, Item<'a>>,
 	subtree: &EditDocumentParams,
 	curr: &str,
 	parent: Option<&str>,
@@ -165,22 +124,23 @@ fn merge_edit_subtree<'a>(
 	let curr_item = curr_item.unwrap();
 	let mut curr_item_id = curr_item_id.unwrap();
 
-	if !existing_items.contains_key(&curr_item_id) {
-		// add this item to db if necessary
-		if let Some(ref parent_id_str) = parent {
-			if let Ok(parent_uuid) = ItemID::from_str(&parent_id_str) {
-				let new_item = doc.add_item(Some(parent_uuid), curr_item.child_order)?;
-				curr_item_id = new_item.get_id();
-			}
+	if let Some(ref parent_id_str) = parent {
+		// add this item, unless it's the root of the subtree
+		if let Ok(parent_uuid) = ItemID::from_str(&parent_id_str) {
+			let new_item = doc.add_item(
+				Some(parent_uuid),
+				curr_item.child_order,
+				curr_item.item_text.clone(),
+			)?;
+
+			curr_item_id = new_item.get_id();
 		}
 	}
-
-	remove_children(&doc, existing_items, &curr_item.children, curr)?;
 
 	let mut child_ids = curr_item	// handle children
 		.children
 		.iter()
-		.map(|child_id| merge_edit_subtree(doc, existing_items, subtree, child_id, Some(&curr_item_id.json_str())))
+		.map(|child_id| merge_edit_subtree(doc, subtree, child_id, Some(&curr_item_id.json_str())))
 		.fold(Ok(HashMap::<String, Option<ItemID>>::new()),
 			|prev_result : QueryResult<HashMap<String, Option<ItemID>>>, curr_children| {
 				let mut prev = prev_result?;
@@ -198,6 +158,19 @@ fn merge_edit_subtree<'a>(
 	Ok(child_ids)
 }
 
+fn update_root(doc: &mut Document, subtree: &EditDocumentParams) -> Result<(), Error> {
+	let mut root_item = doc.get_item(&ItemID::from_str(&subtree.root_item)?)?;
+	root_item.remove_children()?;
+
+	if let Some(root_edit_item) = subtree.items.get(&subtree.root_item) {
+		if let Some(ref text) = root_edit_item.item_text {
+			root_item.update_text(&text)?;
+		}
+	}
+
+	Ok(())
+}
+
 #[post("/<doc_id>/edit", format = "json", data = "<subtree>")]
 fn edit_document(
 	doc_id: DocumentID,
@@ -211,15 +184,9 @@ fn edit_document(
 		return Err(Error::InsufficientPermissions);
 	}
 
-	let mut existing_items = get_existing_items(&doc)?;
+	update_root(&mut doc, &subtree)?;
 
-	let id_map = merge_edit_subtree(
-		&mut doc,
-		&mut existing_items,
-		&subtree,
-		&subtree.root_item,
-		None,
-	)?;
+	let id_map = merge_edit_subtree(&mut doc, &subtree, &subtree.root_item, None)?;
 
 	Ok(send_success(&id_map))
 }
