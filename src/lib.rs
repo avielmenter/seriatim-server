@@ -42,7 +42,7 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> quote::Tokens {
 				request
 					.cookies()
 					.get_private(Self::cookie_name())
-					.and_then(|c_id| uuid::Uuid::parse_str(c_id.value()).ok())
+					.and_then(|c_id| { println!("FOUND COOKIE: {}", c_id.value()); uuid::Uuid::parse_str(c_id.value()).ok() })
 					.and_then(|uuid| Some(Self::from_uuid(uuid)))
 					.or_forward(())
 			}
