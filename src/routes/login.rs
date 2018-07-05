@@ -1,3 +1,5 @@
+use cookie;
+
 use data::db::Connection;
 use data::user::User;
 
@@ -61,9 +63,9 @@ fn twitter_callback(
 	let user_id = db_user.get_id();
 
 	let mut user_id_cookie = user_id.to_cookie();
-	user_id_cookie.set_domain(env::var("SERIATIM_SESSION_DOMAIN").unwrap());
-	user_id_cookie.set_path("/");
-	// user_id_cookie.set_same_site(SameSite::Lax);
+	//user_id_cookie.set_domain(env::var("SERIATIM_SESSION_DOMAIN").unwrap());
+	//user_id_cookie.set_path("/");
+	user_id_cookie.set_same_site(cookie::SameSite::Lax);
 
 	cookies.add_private(user_id_cookie);
 	Ok(redirect_response(redirect.url))
