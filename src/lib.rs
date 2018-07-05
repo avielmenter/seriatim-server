@@ -15,7 +15,7 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> quote::Tokens {
 
 		impl #name {
 			pub fn cookie_name() -> &'static str {
-				"#name"
+				stringify!(#name)
 			}
 
 			pub fn from_uuid(uuid: uuid::Uuid) -> Self {

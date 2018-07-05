@@ -16,8 +16,6 @@ use routes::io::redirect_response;
 use std;
 use std::env;
 
-use url;
-
 const RETURN_URL_COOKIE: &'static str = "redirect_url";
 
 #[derive(FromForm)]
@@ -63,17 +61,9 @@ fn twitter_callback(
 	let user_id = db_user.get_id();
 
 	let mut user_id_cookie = user_id.to_cookie();
-	user_id_cookie.set_http_only(false);
+	user_id_cookie.set_domain(env::var("SERIATIM_SESSION_DOMAIN").unwrap());
 
 	cookies.add_private(user_id_cookie);
-	/*
-	let encoded = url::form_urlencoded::Serializer::new(String::new())
-		.append_pair("redirect", &redirect.url)
-		.a
-
-	let mut redirect_url = env::var("SERIATIM_ALLOWED_ORIGIN") + &"/?";
-*/
-
 	Ok(redirect_response(redirect.url))
 }
 
