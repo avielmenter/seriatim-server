@@ -23,14 +23,14 @@ impl Fairing for CORS {
 		{
 			response.set_header(Header::new(
 				"Access-Control-Allow-Origin",
-				"*" //env::var("SERIATIM_ALLOWED_ORIGIN").unwrap(),
+				env::var("SERIATIM_ALLOWED_ORIGIN").unwrap(),
 			));
 			response.set_header(Header::new(
 				"Access-Control-Allow-Methods",
 				"POST, GET, DELETE, OPTIONS",
 			));
 			response.set_header(Header::new("Access-Control-Allow-Headers", "Content-Type"));
-			//response.set_header(Header::new("Access-Control-Allow-Credentials", "true"));
+			fresponse.set_header(Header::new("Access-Control-Allow-Credentials", "true"));
 		}
 
 		if request.method() == Method::Options {
