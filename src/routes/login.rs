@@ -8,7 +8,7 @@ use rocket;
 use rocket::http::{Cookie, Cookies};
 use rocket::outcome::IntoOutcome;
 use rocket::request::{FromRequest, Outcome, Request};
-use rocket::response::Response;
+use rocket::response::{Redirect, Response};
 use rocket::Route;
 
 use routes::io::redirect_response;
@@ -39,13 +39,18 @@ impl<'a, 'r> FromRequest<'a, 'r> for ReturnURL {
 	}
 }
 
+#[get("/redirect")]
+fn redirect<'a>(redirect: ReturnURL) -> Response<'a> {
+	redirect_response(redirect.url)
+}
+
 #[get("/twitter/callback?<oauth_params>")]
 fn twitter_callback(
 	oauth_params: twitter::TwitterOAuthQueryParams,
 	redirect: ReturnURL,
 	mut cookies: Cookies,
 	con: Connection,
-) -> Result<Response, Box<std::error::Error>> {
+) -> Result<Redirect, Box<std::error::Error>> {
 	let twitter_key = env::var("SERIATIM_TWITTER_KEY").unwrap();
 	let twitter_secret = env::var("SERIATIM_TWITTER_SECRET").unwrap();
 
@@ -61,7 +66,8 @@ fn twitter_callback(
 	let user_id = db_user.get_id();
 
 	cookies.add_private(user_id.to_cookie());
-	Ok(redirect_response(redirect.url))
+	Ok(Redirect::to("/login/redirect"))
+	//Ok(redirect_response(redirect.url))
 }
 
 #[get("/twitter?<redirect>")]
@@ -85,5 +91,5 @@ fn twitter_login(redirect: ReturnURL, mut cookies: Cookies) -> Response {
 }
 
 pub fn routes() -> Vec<Route> {
-	routes![twitter_login, twitter_callback]
+	routes![redirect, twitter_login, twitter_callback]
 }
