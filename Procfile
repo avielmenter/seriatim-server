@@ -1,1 +1,1 @@
-web: ./target/release/seriatim-server
+web: ROCKET_PORT=$PORT ./target/release/seriatim-server
