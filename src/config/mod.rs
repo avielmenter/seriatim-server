@@ -6,6 +6,7 @@ pub struct SeriatimConfig {
 	pub twitter_key: String,
 	pub twitter_secret: String,
 	pub allowed_origin: String,
+	pub session_domain: String,
 	pub database_url: String,
 }
 
@@ -16,6 +17,7 @@ impl SeriatimConfig {
 			twitter_key: env::var("SERIATIM_TWITTER_KEY").unwrap(),
 			twitter_secret: env::var("SERIATIM_TWITTER_SECRET").unwrap(),
 			allowed_origin: env::var("SERIATIM_ALLOWED_ORIGIN").unwrap(),
+			session_domain: env::var("SERIATIM_SESSION_DOMAIN").unwrap(),
 			database_url: env::var("DATABASE_URL").unwrap(),
 		}
 	}
@@ -26,6 +28,7 @@ impl fmt::Display for SeriatimConfig {
 		writeln!(f, "    => seriatim_domain:         {}", self.domain)?;
 		writeln!(f, "    => seriatim_twitter_key:    set")?;
 		writeln!(f, "    => seriatim_twitter_secret: set")?;
+		writeln!(f, "    => seriatim_session_domain: {}", self.session_domain)?;
 		writeln!(f, "    => seriatim_allowed_origin: {}", self.allowed_origin)?;
 		write!(f, "    => database_url:            set")
 	}
