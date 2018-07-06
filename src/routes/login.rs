@@ -1,3 +1,5 @@
+use config::SeriatimConfig;
+
 use data::db::Connection;
 use data::user::User;
 
@@ -10,11 +12,11 @@ use rocket::outcome::IntoOutcome;
 use rocket::request::{FromRequest, Outcome, Request};
 use rocket::response::Response;
 use rocket::Route;
+use rocket::State;
 
 use routes::io::redirect_response;
 
 use std;
-use std::env;
 
 const RETURN_URL_COOKIE: &'static str = "redirect_url";
 
@@ -40,16 +42,14 @@ impl<'a, 'r> FromRequest<'a, 'r> for ReturnURL {
 }
 
 #[get("/twitter/callback?<oauth_params>")]
-fn twitter_callback(
+fn twitter_callback<'a>(
 	oauth_params: twitter::TwitterOAuthQueryParams,
 	redirect: ReturnURL,
 	mut cookies: Cookies,
 	con: Connection,
-) -> Result<Response, Box<std::error::Error>> {
-	let twitter_key = env::var("SERIATIM_TWITTER_KEY").unwrap();
-	let twitter_secret = env::var("SERIATIM_TWITTER_SECRET").unwrap();
-
-	let twitter_user = Twitter::create(twitter_key, twitter_secret)
+	cfg: State<SeriatimConfig>,
+) -> Result<Response<'a>, Box<std::error::Error>> {
+	let twitter_user = Twitter::create(cfg.twitter_key.clone(), cfg.twitter_secret.clone())
 		.verify_request_token(oauth_params.oauth_verifier, oauth_params.oauth_token)?
 		.verify_credentials()?;
 
@@ -60,22 +60,21 @@ fn twitter_callback(
 
 	let user_id = db_user.get_id();
 
-	let mut user_id_cookie = user_id.to_cookie();
-	user_id_cookie.set_domain(env::var("SERIATIM_SESSION_DOMAIN").unwrap());
-	user_id_cookie.set_path("/");
-	//user_id_cookie.make_permanent();
+	let user_id_cookie = user_id.to_cookie();
 
 	cookies.add_private(user_id_cookie);
 	Ok(redirect_response(redirect.url))
 }
 
 #[get("/twitter?<redirect>")]
-fn twitter_login(redirect: ReturnURL, mut cookies: Cookies) -> Response {
-	let callback = env::var("SERIATIM_DOMAIN").unwrap() + &"login/twitter/callback".to_string();
-	let twitter_key = env::var("SERIATIM_TWITTER_KEY").unwrap();
-	let twitter_secret = env::var("SERIATIM_TWITTER_SECRET").unwrap();
+fn twitter_login<'a>(
+	redirect: ReturnURL,
+	mut cookies: Cookies,
+	cfg: State<SeriatimConfig>,
+) -> Response<'a> {
+	let callback = cfg.domain.clone() + &"login/twitter/callback".to_string();
 
-	let mut auth = Twitter::create(twitter_key, twitter_secret);
+	let mut auth = Twitter::create(cfg.twitter_key.clone(), cfg.twitter_secret.clone());
 	let oauth_url = auth.get_redirect_url(callback);
 
 	if let Ok(redirect_url) = oauth_url {

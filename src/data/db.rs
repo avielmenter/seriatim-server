@@ -1,3 +1,5 @@
+use config::SeriatimConfig;
+
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 
@@ -5,12 +7,10 @@ use rocket::http::Status;
 use rocket::request::{self, FromRequest};
 use rocket::{Outcome, Request, State};
 
-use std::env;
-
 type PgPool = Pool<ConnectionManager<PgConnection>>;
 
-pub fn init_pool() -> PgPool {
-	let manager = ConnectionManager::<PgConnection>::new(env::var("DATABASE_URL").unwrap());
+pub fn init_pool(cfg: &SeriatimConfig) -> PgPool {
+	let manager = ConnectionManager::<PgConnection>::new(cfg.database_url.clone());
 	Pool::new(manager).expect("Could not connect to database")
 }
 
