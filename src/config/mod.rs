@@ -12,11 +12,11 @@ pub struct SeriatimConfig {
 impl SeriatimConfig {
 	pub fn init() -> SeriatimConfig {
 		SeriatimConfig {
-			domain: env::var("seriatim_domain").unwrap(),
-			twitter_key: env::var("seriatim_twitter_key").unwrap(),
-			twitter_secret: env::var("seriatim_twitter_secret").unwrap(),
-			allowed_origin: env::var("seriatim_allowed_origin").unwrap(),
-			database_url: env::var("database_url").unwrap(),
+			domain: env::var("SERIATIM_DOMAIN").unwrap(),
+			twitter_key: env::var("SERIATIM_TWITTER_KEY").unwrap(),
+			twitter_secret: env::var("SERIATIM_TWITTER_SECRET").unwrap(),
+			allowed_origin: env::var("SERIATIM_ALLOWED_ORIGIN").unwrap(),
+			database_url: env::var("DATABASE_URL").unwrap(),
 		}
 	}
 }
