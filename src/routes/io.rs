@@ -17,7 +17,7 @@ pub fn send_success<T: Serialize>(data: &T) -> JsonValue {
 
 pub fn redirect_response(url: String) -> rocket::response::Response<'static> {
 	rocket::response::Response::build()
-		.status(rocket::http::Status::SeeOther)
+		.status(rocket::http::Status::Found)//SeeOther)
 		.raw_header("Location", url)
 		.finalize()
 }
