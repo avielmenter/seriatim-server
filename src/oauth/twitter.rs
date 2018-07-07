@@ -117,7 +117,7 @@ impl Twitter {
 
 			response = request.get_response()?;
 		}
-		println!("OAUTH RESPONSE: {}", response);
+
 		self.get_token_from_response(response);
 
 		Ok(

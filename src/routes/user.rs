@@ -17,9 +17,7 @@ fn current_user(connection: Connection, user_id: user::UserID) -> SeriatimResult
 
 #[get("/documents")]
 fn list_documents(connection: Connection, user_id: user::UserID) -> SeriatimResult {
-	println!("LOOKING FOR USER...");
 	let u = User::get_by_id(&connection, &user_id)?;
-	println!("RETRIEVING DOCUMENTS...");
 	let docs = u.get_documents()?;
 
 	Ok(send_success(&docs))
