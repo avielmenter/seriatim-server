@@ -188,6 +188,7 @@ fn edit_document(
 
 	let id_map = merge_edit_subtree(&mut doc, &subtree, &subtree.root_item, None)?;
 
+	doc.touch()?;
 	Ok(send_success(&id_map))
 }
 
@@ -203,7 +204,7 @@ fn edit_document_text(
 	user_id: user::UserID,
 	changes: Json<HashMap<String, String>>,
 ) -> SeriatimResult {
-	let doc = Document::get_by_id(&connection, &doc_id)?;
+	let mut doc = Document::get_by_id(&connection, &doc_id)?;
 
 	if !doc.can_be_edited_by(&user_id) {
 		Err(Error::InsufficientPermissions)
@@ -217,6 +218,7 @@ fn edit_document_text(
 			}
 		}
 
+		doc.touch()?;
 		Ok(send_success(&()))
 	}
 }

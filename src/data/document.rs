@@ -141,6 +141,17 @@ impl<'a> Document<'a> {
 			.collect())
 	}
 
+	pub fn touch(&mut self) -> QueryResult<&mut Document<'a>> {
+		let updated = diesel::update(documents)
+			.filter(data::schema::documents::dsl::id.eq(&self.data.id))
+			.set(modified_at.eq(Some(std::time::SystemTime::now())))
+			.get_result(&self.connection.pg_connection)?;
+
+		self.data = updated;
+
+		Ok(self)
+	}
+
 	pub fn can_be_viewed_by(self: &Document<'a>, p_user_id: &UserID) -> bool {
 		self.data.user_id.eq(&**p_user_id)
 	}
