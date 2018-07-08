@@ -2,6 +2,7 @@ use config::SeriatimConfig;
 
 use data::db::Connection;
 use data::user::User;
+use data::user::UserID;
 
 use oauth::twitter;
 use oauth::twitter::Twitter;
@@ -88,6 +89,15 @@ fn twitter_login<'a>(
 	}
 }
 
+#[get("/logout?<redirect>")]
+fn logout(redirect: ReturnURL, mut cookies: Cookies) -> Response {
+	cookies
+		.get_private(UserID::cookie_name())
+		.map(|c| cookies.remove_private(c));
+
+	redirect_response(redirect.url)
+}
+
 pub fn routes() -> Vec<Route> {
-	routes![twitter_login, twitter_callback]
+	routes![twitter_login, twitter_callback, logout]
 }

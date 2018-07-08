@@ -79,7 +79,7 @@ impl<'a> Serialize for User<'a> {
 	where
 		S: Serializer,
 	{
-		let mut serialized = serializer.serialize_struct("Document", 3)?;
+		let mut serialized = serializer.serialize_struct("User", 3)?;
 		serialized.serialize_field("user_id", &self.get_id())?;
 		serialized.serialize_field("twitter_name", &self.data.twitter_name)?;
 		serialized.serialize_field("twitter_screen_name", &self.data.twitter_screen_name)?;
