@@ -1,7 +1,8 @@
 extern crate base64;
 extern crate hmacsha1;
-extern crate rand;
 extern crate reqwest;
+
+use rand;
 
 use serde_json;
 

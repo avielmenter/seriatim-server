@@ -8,12 +8,19 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> quote::Tokens {
 	let name = &ast.ident;
 
 	quote! {
+		use rand;
 		use rocket;
 		use rocket::outcome::IntoOutcome;
 		use std;
 		use serde;
 
 		impl #name {
+			fn get_salt() -> String {
+				(0..32)
+					.map(|_| format!("{:x}", rand::random::<u8>()))
+					.fold(String::new(), |acc, x| acc + &x)
+			}
+
 			pub fn cookie_name() -> &'static str {
 				stringify!(#name)
 			}
@@ -24,7 +31,7 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> quote::Tokens {
 
 			#[allow(dead_code)]
 			pub fn to_cookie(&self) -> rocket::http::Cookie<'static> {
-				rocket::http::Cookie::new(Self::cookie_name(), self.0.hyphenated().to_string())
+				rocket::http::Cookie::new(Self::cookie_name(), self.0.hyphenated().to_string() + &"!" + &Self::get_salt())
 			}
 
 			#[allow(dead_code)]
@@ -42,7 +49,13 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> quote::Tokens {
 				request
 					.cookies()
 					.get_private(Self::cookie_name())
-					.and_then(|c_id| uuid::Uuid::parse_str(c_id.value()).ok())
+					.and_then(|c_hash| {
+						let c_str = c_hash.value();
+						let bang_index = c_str.find('!')?;
+
+						Some(c_str.chars().take(bang_index).collect::<String>())
+					})
+					.and_then(|ref c_id| uuid::Uuid::parse_str(c_id).ok())
 					.and_then(|uuid| Some(Self::from_uuid(uuid)))
 					.or_forward(())
 			}
