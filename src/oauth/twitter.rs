@@ -107,17 +107,13 @@ impl Twitter {
 		self.oauth_token = None;
 		self.oauth_token_secret = None;
 
-		let response: String;
-		{
-			let request = self.generate_request(
+		let response =
+			self.generate_request(
 				reqwest::Method::Post,
 				REQUEST_TOKEN_URL.to_string(),
 				params,
 				HashMap::new(),
-			);
-
-			response = request.get_response()?;
-		}
+			).get_response()?;
 
 		self.get_token_from_response(response);
 
@@ -143,17 +139,13 @@ impl Twitter {
 		self.oauth_token = Some(oauth_token);
 		self.oauth_token_secret = None;
 
-		let response: String;
-		{
-			let request = self.generate_request(
+		let response =
+			self.generate_request(
 				reqwest::Method::Post,
 				VERIFY_TOKEN_URL.to_string(),
 				params,
 				HashMap::new(),
-			);
-
-			response = request.get_response()?;
-		}
+			).get_response()?;
 
 		self.get_token_from_response(response);
 		Ok(self)
@@ -163,17 +155,13 @@ impl Twitter {
 		const VERIFY_CREDENTIALS_URL: &'static str =
 			"https://api.twitter.com/1.1/account/verify_credentials.json";
 
-		let response: String;
-		{
-			let request = self.generate_request(
+		let response: String =
+			self.generate_request(
 				reqwest::Method::Get,
 				VERIFY_CREDENTIALS_URL.to_string(),
 				HashMap::new(),
 				HashMap::new(),
-			);
-
-			response = request.get_response()?;
-		}
+			).get_response()?;
 
 		let u: TwitterUser = serde_json::from_str(&response)?;
 
