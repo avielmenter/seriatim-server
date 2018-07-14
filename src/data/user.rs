@@ -28,6 +28,7 @@ struct NewUser {
 	pub display_name: String,
 	pub google_id: Option<String>,
 	pub twitter_screen_name: Option<String>,
+	pub facebook_id: Option<String>,
 }
 
 #[derive(Debug, Queryable, Identifiable)]
@@ -37,6 +38,7 @@ pub struct Data {
 	pub display_name: String,
 	pub google_id: Option<String>,
 	pub twitter_screen_name: Option<String>,
+	pub facebook_id: Option<String>,
 }
 
 impl<'a> User<'a> {
@@ -94,6 +96,7 @@ impl<'a> User<'a> {
 			.values(NewUser {
 				display_name: twitter_user.name.clone(),
 				google_id: None,
+				facebook_id: None,
 				twitter_screen_name: Some(twitter_user.screen_name.clone()),
 			})
 			.get_result(&connection.pg_connection)?;
@@ -110,6 +113,7 @@ impl<'a> User<'a> {
 				display_name: google_user.name.clone(),
 				google_id: Some(google_user.id.clone()),
 				twitter_screen_name: None,
+				facebook_id: None,
 			})
 			.get_result(&connection.pg_connection)?;
 

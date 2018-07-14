@@ -25,6 +25,7 @@ table! {
         display_name -> Text,
         google_id -> Nullable<Text>,
         twitter_screen_name -> Nullable<Text>,
+        facebook_id -> Nullable<Text>,
     }
 }
 
