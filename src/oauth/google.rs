@@ -1,11 +1,11 @@
+use oauth::http::OAuthRequest;
 use reqwest;
 use serde_json;
 use std;
 use std::collections::HashMap;
-use url;
 
-use super::{FromOAuthResponse, OAuth, OAuthResponse};
 use config::SeriatimConfig;
+use oauth::{FromOAuthResponse, OAuth, OAuthResponse};
 
 const SCOPES: &'static str = "https://www.googleapis.com/auth/userinfo.profile";
 
@@ -68,12 +68,6 @@ pub struct GoogleUser {
 	pub id: String,
 }
 
-struct GoogleRequest {
-	url: String,
-	method: reqwest::Method,
-	body_params: HashMap<String, String>,
-}
-
 impl Google {}
 
 impl OAuth for Google {
@@ -90,7 +84,7 @@ impl OAuth for Google {
 			+ "&client_id="
 			+ &self.client_id
 			+ "&redirect_uri="
-			+ &GoogleRequest::url_encode(&self.redirect_uri))
+			+ &OAuthRequest::url_encode(&self.redirect_uri))
 	}
 
 	fn get_oauth_token(
@@ -106,7 +100,7 @@ impl OAuth for Google {
 		body_params.insert("redirect_uri".to_string(), self.redirect_uri.clone());
 		body_params.insert("grant_type".to_string(), "authorization_code".to_string());
 
-		let response = GoogleRequest::create(
+		let response = OAuthRequest::create(
 			OAUTH_TOKEN_URL.to_string(),
 			reqwest::Method::Post,
 			body_params,
@@ -132,8 +126,8 @@ impl OAuth for Google {
 		let url =
 			GET_USER_URL.to_string() + "&key=" + &self.api_key + "&access_token=" + &access_token;
 
-		let response = GoogleRequest::create(url.clone(), reqwest::Method::Get, HashMap::new())
-			.get_response()?;
+		let response =
+			OAuthRequest::create(url.clone(), reqwest::Method::Get, HashMap::new()).get_response()?;
 
 		let u: GoogleUserRaw = serde_json::from_str(&response)?;
 
@@ -158,34 +152,6 @@ impl OAuth for Google {
 			redirect_uri,
 			access_token: None,
 			refresh_token: None,
-		}
-	}
-}
-
-impl GoogleRequest {
-	pub fn url_encode(val: &str) -> String {
-		url::form_urlencoded::byte_serialize(val.as_bytes()).collect()
-	}
-
-	fn get_response(&self) -> Result<String, reqwest::Error> {
-		let http_client = reqwest::Client::new();
-
-		http_client
-			.request(self.method.clone(), &self.url)
-			.form(&self.body_params)
-			.send()?
-			.text()
-	}
-
-	fn create(
-		url: String,
-		method: reqwest::Method,
-		body_params: HashMap<String, String>,
-	) -> GoogleRequest {
-		GoogleRequest {
-			url,
-			method,
-			body_params,
 		}
 	}
 }

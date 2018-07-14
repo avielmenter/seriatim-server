@@ -6,6 +6,7 @@ use data::schema::users::dsl::*;
 use diesel;
 use diesel::prelude::*;
 
+use oauth::facebook::FacebookUser;
 use oauth::google::GoogleUser;
 use oauth::twitter::TwitterUser;
 use oauth::OAuthUser;
@@ -78,6 +79,17 @@ impl<'a> User<'a> {
 		Ok(User { connection, data })
 	}
 
+	pub fn get_by_facebook(
+		connection: &'a Connection,
+		facebook_user: &FacebookUser,
+	) -> QueryResult<User<'a>> {
+		let data = users
+			.filter(facebook_id.eq(&facebook_user.id))
+			.first::<Data>(&connection.pg_connection)?;
+
+		Ok(User { connection, data })
+	}
+
 	pub fn get_by_oauth_user(
 		connection: &'a Connection,
 		oauth_user: &OAuthUser,
@@ -85,6 +97,7 @@ impl<'a> User<'a> {
 		match oauth_user {
 			OAuthUser::Google(google_user) => User::get_by_google(connection, google_user),
 			OAuthUser::Twitter(twitter_user) => User::get_by_twitter(connection, twitter_user),
+			OAuthUser::Facebook(facebook_user) => User::get_by_facebook(connection, facebook_user),
 		}
 	}
 
@@ -120,6 +133,22 @@ impl<'a> User<'a> {
 		Ok(User { connection, data })
 	}
 
+	pub fn create_from_facebook(
+		connection: &'a Connection,
+		facebook_user: &FacebookUser,
+	) -> QueryResult<User<'a>> {
+		let data = diesel::insert_into(users)
+			.values(NewUser {
+				display_name: facebook_user.name.clone(),
+				facebook_id: Some(facebook_user.id.clone()),
+				twitter_screen_name: None,
+				google_id: None,
+			})
+			.get_result(&connection.pg_connection)?;
+
+		Ok(User { connection, data })
+	}
+
 	pub fn create_from_oauth_user(
 		connection: &'a Connection,
 		oauth_user: &OAuthUser,
@@ -127,6 +156,9 @@ impl<'a> User<'a> {
 		match oauth_user {
 			OAuthUser::Google(google_user) => User::create_from_google(connection, google_user),
 			OAuthUser::Twitter(twitter_user) => User::create_from_twitter(connection, twitter_user),
+			OAuthUser::Facebook(facebook_user) => {
+				User::create_from_facebook(connection, facebook_user)
+			}
 		}
 	}
 

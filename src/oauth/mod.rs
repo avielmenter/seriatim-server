@@ -1,4 +1,6 @@
+pub mod facebook;
 pub mod google;
+pub mod http;
 pub mod twitter;
 
 use config::SeriatimConfig;
@@ -15,6 +17,7 @@ use std::str::FromStr;
 pub enum LoginMethod {
 	Twitter,
 	Google,
+	Facebook,
 }
 
 impl LoginMethod {}
@@ -24,6 +27,7 @@ impl fmt::Display for LoginMethod {
 		match self {
 			LoginMethod::Twitter => write!(f, "Twitter"),
 			LoginMethod::Google => write!(f, "Google"),
+			LoginMethod::Facebook => write!(f, "Facebook"),
 		}
 	}
 }
@@ -38,6 +42,8 @@ impl FromStr for LoginMethod {
 			Ok(LoginMethod::Twitter)
 		} else if sanitized == "google" {
 			Ok(LoginMethod::Google)
+		} else if sanitized == "facebook" {
+			Ok(LoginMethod::Facebook)
 		} else {
 			Err(std::io::Error::new(
 				ErrorKind::InvalidInput,
@@ -68,14 +74,13 @@ impl<'r> FromParam<'r> for LoginMethod {
 pub enum OAuthResponse {
 	Google(google::GoogleOAuthResponse),
 	Twitter(twitter::TwitterOAuthResponse),
+	Facebook(facebook::FacebookOAuthResponse),
 }
 
 impl<'f> FromForm<'f> for OAuthResponse {
 	type Error = std::io::Error;
 
 	fn from_form(items: &mut FormItems<'f>, strict: bool) -> Result<OAuthResponse, Self::Error> {
-		println!("PARSING OAUTH RESPONSE");
-
 		let items_str = items.inner_str();
 
 		if let Ok(twitter_response) =
@@ -86,6 +91,10 @@ impl<'f> FromForm<'f> for OAuthResponse {
 			google::GoogleOAuthResponse::from_form(&mut FormItems::from(items_str), strict)
 		{
 			Ok(OAuthResponse::Google(google_response))
+		} else if let Ok(facebook_response) =
+			facebook::FacebookOAuthResponse::from_form(&mut FormItems::from(items_str), strict)
+		{
+			Ok(OAuthResponse::Facebook(facebook_response))
 		} else {
 			Err(std::io::Error::new(
 				ErrorKind::InvalidInput,
@@ -104,6 +113,7 @@ pub trait FromOAuthResponse: Sized {
 pub enum OAuthUser {
 	Google(google::GoogleUser),
 	Twitter(twitter::TwitterUser),
+	Facebook(facebook::FacebookUser),
 }
 
 impl From<google::GoogleUser> for OAuthUser {
@@ -115,6 +125,12 @@ impl From<google::GoogleUser> for OAuthUser {
 impl From<twitter::TwitterUser> for OAuthUser {
 	fn from(user: twitter::TwitterUser) -> Self {
 		OAuthUser::Twitter(user)
+	}
+}
+
+impl From<facebook::FacebookUser> for OAuthUser {
+	fn from(user: facebook::FacebookUser) -> Self {
+		OAuthUser::Facebook(user)
 	}
 }
 
@@ -141,6 +157,7 @@ pub trait OAuth {
 pub enum OAuthSource {
 	Google(google::Google),
 	Twitter(twitter::Twitter),
+	Facebook(facebook::Facebook),
 }
 
 impl OAuthSource {
@@ -160,6 +177,9 @@ impl OAuthSource {
 		match method {
 			LoginMethod::Google => OAuthSource::Google(google::Google::create(cfg, callback)),
 			LoginMethod::Twitter => OAuthSource::Twitter(twitter::Twitter::create(cfg, callback)),
+			LoginMethod::Facebook => {
+				OAuthSource::Facebook(facebook::Facebook::create(cfg, callback))
+			}
 		}
 	}
 
@@ -167,6 +187,7 @@ impl OAuthSource {
 		match self {
 			OAuthSource::Google(g) => g.get_redirect_url(),
 			OAuthSource::Twitter(t) => t.get_redirect_url(),
+			OAuthSource::Facebook(f) => f.get_redirect_url(),
 		}
 	}
 
@@ -186,6 +207,12 @@ impl OAuthSource {
 				)?;
 				t.get_oauth_token(&r)?;
 			}
+			OAuthSource::Facebook(f) => {
+				let r = Self::parse_response::<<facebook::Facebook as OAuth>::TResponse>(
+					&oauth_response,
+				)?;
+				f.get_oauth_token(&r)?;
+			}
 		};
 
 		Ok(self)
@@ -195,6 +222,7 @@ impl OAuthSource {
 		match self {
 			OAuthSource::Google(g) => Ok(OAuthUser::from(g.get_user()?)),
 			OAuthSource::Twitter(t) => Ok(OAuthUser::from(t.get_user()?)),
+			OAuthSource::Facebook(f) => Ok(OAuthUser::from(f.get_user()?)),
 		}
 	}
 }
