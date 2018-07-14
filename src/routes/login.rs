@@ -4,8 +4,7 @@ use data::db::Connection;
 use data::user::User;
 use data::user::UserID;
 
-use oauth::twitter;
-use oauth::twitter::Twitter;
+use oauth::{LoginMethod, OAuthResponse, OAuthSource};
 
 use rocket;
 use rocket::http::{Cookie, Cookies};
@@ -42,41 +41,48 @@ impl<'a, 'r> FromRequest<'a, 'r> for ReturnURL {
 	}
 }
 
-#[get("/twitter/callback?<oauth_params>")]
-fn twitter_callback<'a>(
-	oauth_params: twitter::TwitterOAuthQueryParams,
+fn get_callback(cfg: &SeriatimConfig, method: &LoginMethod) -> String {
+	cfg.domain.clone() + "login/" + &format!("{}", method).to_ascii_lowercase() + "/callback"
+}
+
+#[get("/<login_method>/callback?<oauth_params>")]
+fn login_callback<'a>(
+	login_method: LoginMethod,
+	oauth_params: OAuthResponse,
 	redirect: ReturnURL,
 	mut cookies: Cookies,
 	con: Connection,
 	cfg: State<SeriatimConfig>,
 ) -> Result<Response<'a>, Box<std::error::Error>> {
-	let twitter_user = Twitter::create(cfg.twitter_key.clone(), cfg.twitter_secret.clone())
-		.verify_request_token(oauth_params.oauth_verifier, oauth_params.oauth_token)?
-		.verify_credentials()?;
+	let callback = get_callback(&cfg, &login_method);
 
-	let db_user = match User::get_by_twitter(&con, &twitter_user) {
+	let oauth_user = OAuthSource::create(&login_method, &cfg, callback)
+		.get_oauth_token(&oauth_params)?
+		.get_user()?;
+
+	let db_user = match User::get_by_oauth_user(&con, &oauth_user) {
 		Ok(u) => Ok(u),
-		Err(_) => User::create_from_twitter(&con, &twitter_user),
+		Err(_) => User::create_from_oauth_user(&con, &oauth_user),
 	}?;
 
 	let user_id = db_user.get_id();
-
 	let user_id_cookie = user_id.to_cookie();
 
 	cookies.add_private(user_id_cookie);
 	Ok(redirect_response(redirect.url))
 }
 
-#[get("/twitter?<redirect>")]
-fn twitter_login<'a>(
+#[get("/<login_method>?<redirect>")]
+fn login<'a>(
+	login_method: LoginMethod,
 	redirect: ReturnURL,
 	mut cookies: Cookies,
 	cfg: State<SeriatimConfig>,
 ) -> Response<'a> {
-	let callback = cfg.domain.clone() + &"login/twitter/callback".to_string();
+	let callback = get_callback(&cfg, &login_method);
 
-	let mut auth = Twitter::create(cfg.twitter_key.clone(), cfg.twitter_secret.clone());
-	let oauth_url = auth.get_redirect_url(callback);
+	let mut auth = OAuthSource::create(&login_method, &cfg, callback);
+	let oauth_url = auth.get_redirect_url();
 
 	if let Ok(redirect_url) = oauth_url {
 		cookies.add(Cookie::new(RETURN_URL_COOKIE, redirect.url));
@@ -99,5 +105,5 @@ fn logout(redirect: ReturnURL, mut cookies: Cookies) -> Response {
 }
 
 pub fn routes() -> Vec<Route> {
-	routes![twitter_login, twitter_callback, logout]
+	routes![login, login_callback, logout]
 }

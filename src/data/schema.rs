@@ -22,7 +22,8 @@ table! {
 table! {
     users (id) {
         id -> Uuid,
-        twitter_name -> Nullable<Text>,
+        display_name -> Text,
+        google_id -> Nullable<Text>,
         twitter_screen_name -> Nullable<Text>,
     }
 }

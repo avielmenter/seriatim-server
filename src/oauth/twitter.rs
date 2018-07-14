@@ -1,41 +1,45 @@
-extern crate base64;
-extern crate hmacsha1;
-extern crate reqwest;
-
+use base64;
+use hmacsha1;
 use rand;
-
+use reqwest;
 use serde_json;
-
 use std;
 use std::collections::HashMap;
-
 use url;
 
-use data::schema::users;
+use super::{FromOAuthResponse, OAuth, OAuthResponse};
+use config::SeriatimConfig;
 
 const NONCE_LENGTH: u32 = 32;
 const OAUTH_VERSION: &'static str = "1.0";
 const OAUTH_SIGNATURE_METHOD: &'static str = "HMAC-SHA1";
 
 #[derive(FromForm)]
-pub struct TwitterOAuthQueryParams {
+pub struct TwitterOAuthResponse {
 	pub oauth_token: String,
 	pub oauth_verifier: String,
+}
+
+impl FromOAuthResponse for TwitterOAuthResponse {
+	fn from_response(oauth_response: &OAuthResponse) -> Option<&Self> {
+		match oauth_response {
+			OAuthResponse::Twitter(twitter_response) => Some(twitter_response),
+			_ => None,
+		}
+	}
 }
 
 pub struct Twitter {
 	oauth_consumer_key: String,
 	oauth_consumer_secret: String,
+	redirect_url: String,
 	oauth_token_secret: Option<String>,
 	oauth_token: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Insertable, Debug)]
-#[table_name = "users"]
+#[derive(Deserialize)]
 pub struct TwitterUser {
-	#[column_name = "twitter_name"]
 	pub name: String,
-	#[column_name = "twitter_screen_name"]
 	pub screen_name: String,
 }
 
@@ -95,14 +99,19 @@ impl Twitter {
 			}
 		}
 	}
+}
 
-	pub fn get_redirect_url(&mut self, callback: String) -> Result<String, reqwest::Error> {
+impl OAuth for Twitter {
+	type TResponse = TwitterOAuthResponse;
+	type TUser = TwitterUser;
+
+	fn get_redirect_url(&mut self) -> Result<String, reqwest::Error> {
 		const REQUEST_TOKEN_URL: &'static str = "https://api.twitter.com/oauth/request_token";
 		const OAUTH_TOKEN_URL: &'static str =
 			"https://api.twitter.com/oauth/authenticate?oauth_token=";
 
 		let mut params: HashMap<String, String> = HashMap::new();
-		params.insert("oauth_callback".to_string(), callback);
+		params.insert("oauth_callback".to_string(), self.redirect_url.clone());
 
 		self.oauth_token = None;
 		self.oauth_token_secret = None;
@@ -126,17 +135,19 @@ impl Twitter {
 		)
 	}
 
-	pub fn verify_request_token(
+	fn get_oauth_token(
 		&mut self,
-		oauth_verifier: String,
-		oauth_token: String,
-	) -> Result<&mut Twitter, reqwest::Error> {
+		oauth_response: &TwitterOAuthResponse,
+	) -> Result<&mut Twitter, Box<std::error::Error>> {
 		const VERIFY_TOKEN_URL: &'static str = "https://api.twitter.com/oauth/access_token";
 
 		let mut params: HashMap<String, String> = HashMap::new();
-		params.insert("oauth_verifier".to_string(), oauth_verifier);
+		params.insert(
+			"oauth_verifier".to_string(),
+			oauth_response.oauth_verifier.clone(),
+		);
 
-		self.oauth_token = Some(oauth_token);
+		self.oauth_token = Some(oauth_response.oauth_token.clone());
 		self.oauth_token_secret = None;
 
 		let response =
@@ -151,7 +162,7 @@ impl Twitter {
 		Ok(self)
 	}
 
-	pub fn verify_credentials(&self) -> Result<TwitterUser, Box<std::error::Error>> {
+	fn get_user(&self) -> Result<TwitterUser, Box<std::error::Error>> {
 		const VERIFY_CREDENTIALS_URL: &'static str =
 			"https://api.twitter.com/1.1/account/verify_credentials.json";
 
@@ -168,10 +179,11 @@ impl Twitter {
 		Ok(u)
 	}
 
-	pub fn create(set_consumer_key: String, set_consumer_secret: String) -> Twitter {
+	fn create(cfg: &SeriatimConfig, redirect_url: String) -> Twitter {
 		Twitter {
-			oauth_consumer_key: set_consumer_key,
-			oauth_consumer_secret: set_consumer_secret,
+			oauth_consumer_key: cfg.twitter_key.clone(),
+			oauth_consumer_secret: cfg.twitter_secret.clone(),
+			redirect_url,
 			oauth_token_secret: None,
 			oauth_token: None,
 		}

@@ -1,9 +1,17 @@
-#![feature(plugin, decl_macro, custom_derive, custom_attribute, associated_type_defaults)]
+#![feature(
+	plugin,
+	decl_macro,
+	custom_derive,
+	custom_attribute,
+	associated_type_defaults
+)]
 #![plugin(rocket_codegen)]
 
+extern crate base64;
 #[macro_use]
 extern crate diesel;
 extern crate dotenv;
+extern crate hmacsha1;
 extern crate rand;
 extern crate reqwest;
 extern crate rocket;
