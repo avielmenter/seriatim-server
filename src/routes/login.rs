@@ -72,6 +72,11 @@ fn login_callback<'a>(
 	Ok(redirect_response(redirect.url))
 }
 
+#[get("/<_login_method>/callback")]
+fn login_denied<'a>(_login_method: LoginMethod, redirect: ReturnURL) -> Response<'a> {
+	redirect_response(redirect.url)
+}
+
 #[get("/<login_method>?<redirect>")]
 fn login<'a>(
 	login_method: LoginMethod,
@@ -105,5 +110,5 @@ fn logout(redirect: ReturnURL, mut cookies: Cookies) -> Response {
 }
 
 pub fn routes() -> Vec<Route> {
-	routes![login, login_callback, logout]
+	routes![login, login_denied, login_callback, logout]
 }
