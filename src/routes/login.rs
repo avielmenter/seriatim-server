@@ -99,7 +99,10 @@ fn login_merge<'a>(
 		.get_oauth_token(&oauth_params)?
 		.get_user()?;
 
-	let merge_from = User::get_by_oauth_user(&con, &oauth_user)?;
+	let merge_from = match User::get_by_oauth_user(&con, &oauth_user) {
+		Ok(u) => Ok(u),
+		Err(_) => User::create_from_oauth_user(&con, &oauth_user),
+	}?;
 
 	merge_into.merge(&merge_from)?;
 

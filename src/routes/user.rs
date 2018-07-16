@@ -2,6 +2,8 @@ use data::db::Connection;
 use data::user;
 use data::user::User;
 
+use oauth::LoginMethod;
+
 use rocket::Route;
 use rocket_contrib::Json;
 
@@ -41,11 +43,32 @@ fn update_user(
 	Ok(send_success(&u))
 }
 
+#[post("/remove_login/<login_method>")]
+fn remove_login(
+	con: Connection,
+	user_id: user::UserID,
+	login_method: LoginMethod,
+) -> SeriatimResult {
+	let mut u = User::get_by_id(&con, &user_id)?;
+
+	if u.count_login_methods() <= 1 {
+		Err(Error::TooFewLoginMethods)
+	} else {
+		Ok(send_success(u.remove_login_method(&login_method)?))
+	}
+}
+
 #[get("/<_path..>")]
 fn not_logged_in(_path: std::path::PathBuf) -> SeriatimResult {
 	Err(Error::NotLoggedIn)
 }
 
 pub fn routes() -> Vec<Route> {
-	routes![current_user, list_documents, update_user, not_logged_in]
+	routes![
+		current_user,
+		list_documents,
+		update_user,
+		remove_login,
+		not_logged_in
+	]
 }

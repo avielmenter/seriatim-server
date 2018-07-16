@@ -11,7 +11,7 @@ use diesel::Connection as DieselConnection;
 use oauth::facebook::FacebookUser;
 use oauth::google::GoogleUser;
 use oauth::twitter::TwitterUser;
-use oauth::OAuthUser;
+use oauth::{LoginMethod, OAuthUser};
 
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 
@@ -252,6 +252,36 @@ impl<'a> User<'a> {
 			.filter(id.eq(&self.data.id))
 			.set(display_name.eq(new_display_name))
 			.get_result::<Data>(&self.connection.pg_connection)?;
+
+		self.data = new_data;
+
+		Ok(self)
+	}
+
+	pub fn count_login_methods(&self) -> u8 {
+		(if self.has_facebook() { 1 } else { 0 })
+			+ (if self.has_google() { 1 } else { 0 })
+			+ (if self.has_twitter() { 1 } else { 0 })
+	}
+
+	pub fn remove_login_method(&mut self, method: &LoginMethod) -> QueryResult<&mut User<'a>> {
+		if self.count_login_methods() <= 1 {
+			return Ok(self);
+		}
+
+		let update_filter = diesel::update(users).filter(id.eq(self.data.id.clone()));
+
+		let new_data = match method {
+			LoginMethod::Twitter => update_filter
+				.set(twitter_screen_name.eq(None::<String>))
+				.get_result::<Data>(&self.connection.pg_connection),
+			LoginMethod::Facebook => update_filter
+				.set(facebook_id.eq(None::<String>))
+				.get_result::<Data>(&self.connection.pg_connection),
+			LoginMethod::Google => update_filter
+				.set(google_id.eq(None::<String>))
+				.get_result::<Data>(&self.connection.pg_connection),
+		}?;
 
 		self.data = new_data;
 
