@@ -1,2 +1,2 @@
 ALTER TABLE users
-	ADD COLUMN facebook_id TEXT NULL;
+	ADD COLUMN facebook_id TEXT NULL UNIQUE;

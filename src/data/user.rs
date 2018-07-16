@@ -1,10 +1,12 @@
 use data;
 use data::db::Connection;
+use data::schema::documents::dsl::{documents, user_id};
 use data::schema::users;
 use data::schema::users::dsl::*;
 
 use diesel;
 use diesel::prelude::*;
+use diesel::Connection as DieselConnection;
 
 use oauth::facebook::FacebookUser;
 use oauth::google::GoogleUser;
@@ -32,7 +34,7 @@ struct NewUser {
 	pub facebook_id: Option<String>,
 }
 
-#[derive(Debug, Queryable, Identifiable)]
+#[derive(Debug, AsChangeset, Queryable, Identifiable)]
 #[table_name = "users"]
 pub struct Data {
 	id: uuid::Uuid,
@@ -168,6 +170,92 @@ impl<'a> User<'a> {
 
 	pub fn create_document(&self) -> QueryResult<data::document::Document> {
 		data::document::Document::create_for_user(&self.connection, &self.get_id())
+	}
+
+	pub fn has_facebook(&self) -> bool {
+		self.data.facebook_id.clone().unwrap_or("".to_string()) != "".to_string()
+	}
+
+	pub fn has_twitter(&self) -> bool {
+		self.data
+			.twitter_screen_name
+			.clone()
+			.unwrap_or("".to_string()) != "".to_string()
+	}
+
+	pub fn has_google(&self) -> bool {
+		self.data.google_id.clone().unwrap_or("".to_string()) != "".to_string()
+	}
+
+	fn get_merged_user_data(lhs: &Data, rhs: &Data) -> Data {
+		Data {
+			id: lhs.id.clone(),
+			display_name: lhs.display_name.clone(),
+			google_id: if lhs.google_id.is_some() {
+				lhs.google_id.clone()
+			} else {
+				rhs.google_id.clone()
+			},
+			facebook_id: if lhs.facebook_id.is_some() {
+				lhs.facebook_id.clone()
+			} else {
+				rhs.facebook_id.clone()
+			},
+			twitter_screen_name: if lhs.twitter_screen_name.is_some() {
+				lhs.twitter_screen_name.clone()
+			} else {
+				rhs.twitter_screen_name.clone()
+			},
+		}
+	}
+
+	pub fn merge<'b>(&mut self, merge_user: &User<'b>) -> QueryResult<&mut User<'a>> {
+		if (self.has_facebook() && merge_user.has_facebook())
+			|| (self.has_twitter() && merge_user.has_twitter())
+			|| (self.has_google() && merge_user.has_google())
+		{
+			return Err(diesel::result::Error::QueryBuilderError(Box::new(
+				std::io::Error::new(
+					std::io::ErrorKind::InvalidData,
+					"Cannot merge two users with overlapping authentication methods.",
+				),
+			)));
+		}
+
+		let merged_user_data = User::get_merged_user_data(&self.data, &merge_user.data);
+
+		let new_data = self
+			.connection
+			.pg_connection
+			.transaction::<_, diesel::result::Error, _>(|| {
+				diesel::update(documents)
+					.filter(user_id.eq(&merge_user.data.id))
+					.set(user_id.eq(&self.data.id))
+					.execute(&self.connection.pg_connection)?;
+
+				diesel::delete(users)
+					.filter(id.eq(&merge_user.data.id))
+					.execute(&self.connection.pg_connection)?;
+
+				Ok(diesel::update(users)
+					.set(&merged_user_data)
+					.get_result::<Data>(&self.connection.pg_connection)?)
+			})?;
+
+		self.data = new_data;
+
+		Ok(self)
+	}
+
+	pub fn update_display_name(&mut self, new_display_name: &str) -> QueryResult<&mut User<'a>> {
+		let new_data = diesel::update(users)
+			.filter(id.eq(&self.data.id))
+			.set(display_name.eq(new_display_name))
+			.get_result::<Data>(&self.connection.pg_connection)?;
+
+		self.data = new_data;
+
+		Ok(self)
 	}
 }
 

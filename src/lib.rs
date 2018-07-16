@@ -14,6 +14,7 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> quote::Tokens {
 		use std;
 		use serde;
 
+		#[allow(dead_code)]
 		impl #name {
 			fn get_salt() -> String {
 				(0..32)
@@ -29,12 +30,35 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> quote::Tokens {
 				#name(uuid)
 			}
 
-			#[allow(dead_code)]
-			pub fn to_cookie(&self) -> rocket::http::Cookie<'static> {
-				rocket::http::Cookie::new(Self::cookie_name(), self.0.hyphenated().to_string() + &"!" + &Self::get_salt())
+			pub fn cookie_value(&self) -> String {
+				self.0.hyphenated().to_string().clone() + &"!" + &Self::get_salt()
 			}
 
-			#[allow(dead_code)]
+			pub fn to_cookie(&self) -> rocket::http::Cookie<'static> {
+				rocket::http::Cookie::new(Self::cookie_name(), self.cookie_value())
+			}
+
+			pub fn to_named_cookie(&self, name: &'static str) -> rocket::http::Cookie<'static> {
+				rocket::http::Cookie::new(name, self.cookie_value())
+			}
+
+			pub fn from_named_cookie(cookies: &mut rocket::http::Cookies, name: &'static str) -> Option<Self> {
+				cookies
+					.get_private(name)
+					.and_then(|c_hash| {
+						let c_str = c_hash.value();
+						let bang_index = c_str.find('!')?;
+
+						Some(c_str.chars().take(bang_index).collect::<String>())
+					})
+					.and_then(|ref c_id| uuid::Uuid::parse_str(c_id).ok())
+					.and_then(|uuid| Some(Self::from_uuid(uuid)))
+			}
+
+			pub fn from_cookie(cookies: &mut rocket::http::Cookies) -> Option<Self> {
+				Self::from_named_cookie(cookies, Self::cookie_name())
+			}
+
 			pub fn json_str(&self) -> String {
 				self.0.hyphenated().to_string()
 			}
@@ -46,18 +70,7 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> quote::Tokens {
 			fn from_request(
 				request: &'a rocket::request::Request<'r>,
 			) -> rocket::request::Outcome<Self, Self::Error> {
-				request
-					.cookies()
-					.get_private(Self::cookie_name())
-					.and_then(|c_hash| {
-						let c_str = c_hash.value();
-						let bang_index = c_str.find('!')?;
-
-						Some(c_str.chars().take(bang_index).collect::<String>())
-					})
-					.and_then(|ref c_id| uuid::Uuid::parse_str(c_id).ok())
-					.and_then(|uuid| Some(Self::from_uuid(uuid)))
-					.or_forward(())
+				Self::from_cookie(&mut request.cookies()).or_forward(())
 			}
 		}
 
