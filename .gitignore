@@ -1,3 +1,6 @@
 /target
 **/*.rs.bk
 .env
+Rocket.toml
+server.crt
+server.key
