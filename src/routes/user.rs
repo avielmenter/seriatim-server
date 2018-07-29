@@ -4,11 +4,11 @@ use data::user::User;
 
 use oauth::LoginMethod;
 
-use rocket::Route;
+use rocket::{self, Route};
 use rocket_contrib::Json;
 
 use routes::error::Error;
-use routes::io::{send_success, SeriatimResult};
+use routes::io::{cors_response, send_success, SeriatimResult};
 
 use std;
 
@@ -29,6 +29,11 @@ fn list_documents(connection: Connection, user_id: user::UserID) -> SeriatimResu
 #[derive(Deserialize)]
 struct UpdateUserParams {
 	display_name: String,
+}
+
+#[route(OPTIONS, "/update")]
+fn update_options<'a>() -> rocket::response::Response<'a> {
+	cors_response::<'a>()
 }
 
 #[post("/update", format = "json", data = "<update_params>")]
@@ -67,6 +72,7 @@ pub fn routes() -> Vec<Route> {
 	routes![
 		current_user,
 		list_documents,
+		update_options,
 		update_user,
 		remove_login,
 		not_logged_in
