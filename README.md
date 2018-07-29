@@ -29,6 +29,11 @@ To run this application, you must configure certain environment variables on you
  - `SERIATIM_SESSION_DOMAIN`: The domain for which Seriatim's session cookies will be set.
  - `SERIATIM_TWITTER_KEY`: The key for Seriatim's Twitter application. This is necessary for users to log in via Twitter.
  - `SERIATIM_TWITTER_SECRET`: The secret for Seriatim's Twitter application.
+ - `SERIATIM_GOOGLE_ID`: The ID for Seriatim's Google application. This is necessary for users to log in via Google.
+ - `SERIATIM_GOOGLE_SECRET`: The secret for Seriatim's Google application.
+ - `SERIATIM_GOOGLE_API_KEY`: The API Key for Seriatim's Google application.
+ - `SERIATIM_FB_ID`: The ID for Seriatim's Facebook application. This is necessary for users to log in via Facebook.
+ - `SERIATIM_FB_SECRET`: The secret for Seriatim's Facebook application.
 
  You can set these environment variables using your operating system, or you can configure them in a `.env` file placed at the root of the `seriatim-server` directory.
 
