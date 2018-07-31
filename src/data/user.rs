@@ -238,6 +238,7 @@ impl<'a> User<'a> {
 					.execute(&self.connection.pg_connection)?;
 
 				Ok(diesel::update(users)
+					.filter(id.eq(self.data.id))
 					.set(&merged_user_data)
 					.get_result::<Data>(&self.connection.pg_connection)?)
 			})?;
@@ -297,6 +298,7 @@ impl<'a> Serialize for User<'a> {
 		let mut serialized = serializer.serialize_struct("User", 3)?;
 		serialized.serialize_field("user_id", &self.get_id())?;
 		serialized.serialize_field("display_name", &self.data.display_name)?;
+		serialized.serialize_field("facebook_id", &self.data.facebook_id)?;
 		serialized.serialize_field("google_id", &self.data.google_id)?;
 		serialized.serialize_field("twitter_screen_name", &self.data.twitter_screen_name)?;
 
