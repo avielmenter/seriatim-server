@@ -5,6 +5,7 @@ table! {
         root_item_id -> Nullable<Uuid>,
         created_at -> Timestamp,
         modified_at -> Nullable<Timestamp>,
+        publicly_viewable -> Bool,
     }
 }
 

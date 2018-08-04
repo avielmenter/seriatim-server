@@ -6,7 +6,7 @@ use data::user;
 use diesel::result::QueryResult;
 
 use routes::error::Error;
-use routes::io::{cors_response, send_success, SeriatimResult};
+use routes::io::{cors_response, send_success, send_with_permissions, SeriatimResult};
 
 use rocket;
 use rocket::Route;
@@ -16,12 +16,17 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+#[derive(Serialize)]
+struct DocumentPermissions {
+	edit: bool,
+}
+
 #[post("/create")]
 fn create_document(connection: Connection, user_id: user::UserID) -> SeriatimResult {
 	let u = user::User::get_by_id(&connection, &user_id)?;
 	let doc = u.create_document()?;
 
-	Ok(send_success(&doc.serialize_with_items()?))
+	Ok(send_success(&doc))
 }
 
 #[route(OPTIONS, "/<_doc_id>")]
@@ -79,7 +84,42 @@ fn get_document(
 	let doc = Document::get_by_id(&connection, &doc_id)?;
 
 	if doc.can_be_viewed_by(&user_id) {
-		Ok(send_success(&doc.serialize_with_items()?))
+		Ok(send_with_permissions(
+			&doc.serialize_with_items()?,
+			&DocumentPermissions {
+				edit: doc.can_be_edited_by(&user_id),
+			},
+		))
+	} else {
+		Err(Error::InsufficientPermissions)
+	}
+}
+
+#[get("/<doc_id>", rank = 1)]
+fn get_anonymously(doc_id: DocumentID, connection: Connection) -> SeriatimResult {
+	let doc = Document::get_by_id(&connection, &doc_id)?;
+
+	if doc.can_be_viewed_anonymously() {
+		Ok(send_with_permissions(
+			&doc.serialize_with_items()?,
+			&DocumentPermissions { edit: false },
+		))
+	} else {
+		Err(Error::InsufficientPermissions)
+	}
+}
+
+#[post("/<doc_id>/copy")]
+fn copy_document(
+	doc_id: DocumentID,
+	connection: Connection,
+	user_id: user::UserID,
+) -> SeriatimResult {
+	let doc = Document::get_by_id(&connection, &doc_id)?;
+
+	if doc.can_be_viewed_by(&user_id) {
+		let new_doc = doc.copy_to_user(&user_id)?;
+		Ok(send_success(&new_doc))
 	} else {
 		Err(Error::InsufficientPermissions)
 	}
@@ -223,6 +263,38 @@ fn edit_document_text(
 	}
 }
 
+#[derive(Serialize, Deserialize)]
+struct DocumentViewabilityParams {
+	publicly_viewable: bool,
+}
+
+#[route(OPTIONS, "/<_doc_id>/public_viewability")]
+fn public_viewability_options<'a>(_doc_id: DocumentID) -> rocket::response::Response<'a> {
+	cors_response::<'a>()
+}
+
+#[post(
+	"/<doc_id>/public_viewability",
+	format = "json",
+	data = "<viewability>"
+)]
+fn public_viewability(
+	doc_id: DocumentID,
+	connection: Connection,
+	user_id: user::UserID,
+	viewability: Json<DocumentViewabilityParams>,
+) -> SeriatimResult {
+	let mut doc = Document::get_by_id(&connection, &doc_id)?;
+
+	if !doc.is_owned_by(&user_id) {
+		Err(Error::InsufficientPermissions)
+	} else {
+		Ok(send_success(
+			&doc.set_publicly_viewable(viewability.publicly_viewable)?,
+		))
+	}
+}
+
 #[get("/<_path..>", rank = 2)]
 fn not_logged_in_get(_path: PathBuf) -> SeriatimResult {
 	Err(Error::NotLoggedIn)
@@ -241,10 +313,14 @@ pub fn routes() -> Vec<Route> {
 		rename_document,
 		rename_options,
 		get_document,
+		get_anonymously,
+		copy_document,
 		edit_options,
 		edit_document,
 		edit_text_options,
 		edit_document_text,
+		public_viewability_options,
+		public_viewability,
 		not_logged_in_get,
 		not_logged_in_post,
 	]

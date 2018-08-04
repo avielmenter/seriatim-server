@@ -38,6 +38,7 @@ pub struct Data {
 	root_item_id: Option<uuid::Uuid>,
 	pub created_at: SystemTime,
 	pub modified_at: Option<SystemTime>,
+	pub publicly_viewable: bool,
 }
 
 #[derive(Insertable)]
@@ -156,6 +157,10 @@ impl<'a> Document<'a> {
 		self.data.user_id.eq(&**p_user_id)
 	}
 
+	pub fn can_be_viewed_anonymously(&self) -> bool {
+		self.data.publicly_viewable
+	}
+
 	pub fn can_be_edited_by(self: &Document<'a>, p_user_id: &UserID) -> bool {
 		self.data.user_id.eq(&**p_user_id)
 	}
@@ -175,6 +180,76 @@ impl<'a> Document<'a> {
 			.first::<super::item::Data>(&self.connection.pg_connection)?;
 
 		Ok(Item::new(&self.connection, data))
+	}
+
+	fn copy_item_children(
+		self: &mut Document<'a>,
+		p_items: &Vec<super::item::Item<'a>>,
+		old_parent_id: ItemID,
+		new_parent_id: Option<ItemID>,
+	) -> QueryResult<()> {
+		p_items
+			.iter()
+			.filter(|i| {
+				i.get_parent_id()
+					.and_then(|pid| Some(pid == old_parent_id))
+					.unwrap_or(false)
+			})
+			.map(|i| {
+				self.copy_item(
+					&p_items,
+					&i,
+					match new_parent_id {
+						Some(ref npi) => Some(ItemID::from_uuid(**npi.clone())),
+						None => None,
+					},
+				)
+			})
+			.fold(Ok(()), |prev: QueryResult<()>, r| match prev {
+				Err(e) => Err(e),
+				Ok(()) => r,
+			})
+	}
+
+	fn copy_item(
+		self: &mut Document<'a>,
+		p_items: &Vec<super::item::Item<'a>>,
+		curr_item: &super::item::Item<'a>,
+		new_parent_id: Option<ItemID>,
+	) -> QueryResult<()> {
+		let new_item_id = {
+			self.add_item(
+				new_parent_id,
+				curr_item.data.child_order,
+				Some(curr_item.data.item_text.clone()),
+			)?
+				.get_id()
+		};
+
+		self.copy_item_children(&p_items, curr_item.get_id(), Some(new_item_id))?;
+
+		Ok(())
+	}
+
+	pub fn copy_to_user(&self, p_user_id: &UserID) -> QueryResult<Self> {
+		let mut new_document = Self::create_for_user(&self.connection, &p_user_id)?;
+		new_document.rename(&self.get_title().unwrap_or("".to_string()))?;
+
+		let new_root_id = match new_document.data.root_item_id {
+			None => None,
+			Some(r) => Some(ItemID::from_uuid(r.clone())),
+		};
+
+		match self.data.root_item_id {
+			Some(r) => new_document.copy_item_children(
+				&self.get_items()?,
+				ItemID::from_uuid(r.clone()),
+				new_root_id,
+			),
+			None => Ok(()),
+		}?;
+
+		Ok(new_document)
 	}
 
 	pub fn get_root(&self) -> QueryResult<Item> {
@@ -223,6 +298,17 @@ impl<'a> Document<'a> {
 			.execute(&self.connection.pg_connection)
 	}
 
+	pub fn set_publicly_viewable(&mut self, p_publicly_viewable: bool) -> QueryResult<&mut Self> {
+		let new_data = diesel::update(documents)
+			.filter(data::schema::documents::dsl::id.eq(&self.data.id))
+			.set(publicly_viewable.eq(p_publicly_viewable))
+			.get_result(&self.connection.pg_connection)?;
+
+		self.data = new_data;
+
+		Ok(self)
+	}
+
 	pub fn serialize_with_items(&'a self) -> QueryResult<DocumentWithItems<'a>> {
 		let items_hashmap = self.get_items()?.into_iter().fold(
 			std::collections::HashMap::new(),
@@ -247,14 +333,23 @@ fn serialize_document<'a, S>(
 where
 	S: Serializer,
 {
-	let mut serialized =
-		serializer.serialize_struct("Document", if items_hashmap.is_some() { 6 } else { 5 })?;
+	let count_fields = 7;
+
+	let mut serialized = serializer.serialize_struct(
+		"Document",
+		if items_hashmap.is_some() {
+			count_fields
+		} else {
+			count_fields - 1
+		},
+	)?;
 
 	serialized.serialize_field("document_id", &document.get_id())?;
 	serialized.serialize_field("title", &document.get_serialized_title())?;
 	serialized.serialize_field("root_item_id", &document.get_serialized_root_id())?;
 	serialized.serialize_field("created_at", &document.data.created_at)?;
 	serialized.serialize_field("modified_at", &document.data.modified_at)?;
+	serialized.serialize_field("publicly_viewable", &document.data.publicly_viewable)?;
 
 	if let Some(ser_items) = items_hashmap {
 		serialized.serialize_field("items", ser_items)?;

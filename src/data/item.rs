@@ -38,6 +38,12 @@ impl<'a> Item<'a> {
 		ItemID::from_uuid(self.data.id.clone())
 	}
 
+	pub fn get_parent_id(&self) -> Option<ItemID> {
+		self.data
+			.parent_id
+			.and_then(|p| Some(ItemID::from_uuid(p.clone())))
+	}
+
 	fn results_list(
 		connection: &'a Connection,
 		items_list: Vec<Data>,

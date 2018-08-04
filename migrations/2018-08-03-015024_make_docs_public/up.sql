@@ -1,0 +1,2 @@
+ALTER TABLE documents
+	ADD COLUMN publicly_viewable BOOLEAN NOT NULL DEFAULT FALSE;

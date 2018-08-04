@@ -15,6 +15,14 @@ pub fn send_success<T: Serialize>(data: &T) -> JsonValue {
 	})
 }
 
+pub fn send_with_permissions<T: Serialize, P: Serialize>(data: &T, permissions: &P) -> JsonValue {
+	json!({
+		"status": "success",
+		"permissions": permissions,
+		"data": data
+	})
+}
+
 pub fn redirect_response(url: String) -> rocket::response::Response<'static> {
 	rocket::response::Response::build()
 		.status(rocket::http::Status::Found)//SeeOther)
