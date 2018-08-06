@@ -5,12 +5,14 @@ use routes::error::Error;
 use serde::ser::Serialize;
 
 use std::env;
+use std::time::SystemTime;
 
 pub type SeriatimResult = Result<JsonValue, Error>;
 
 pub fn send_success<T: Serialize>(data: &T) -> JsonValue {
 	json!({
 		"status": "success",
+		"timestamp": SystemTime::now(),
 		"data": data
 	})
 }
@@ -18,6 +20,7 @@ pub fn send_success<T: Serialize>(data: &T) -> JsonValue {
 pub fn send_with_permissions<T: Serialize, P: Serialize>(data: &T, permissions: &P) -> JsonValue {
 	json!({
 		"status": "success",
+		"timestamp": SystemTime::now(),
 		"permissions": permissions,
 		"data": data
 	})
