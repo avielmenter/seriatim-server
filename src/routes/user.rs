@@ -1,6 +1,9 @@
 use data::db::Connection;
+use data::document::SerializableDocument;
 use data::user;
 use data::user::User;
+
+use diesel::result::QueryResult;
 
 use oauth::LoginMethod;
 
@@ -23,7 +26,12 @@ fn list_documents(connection: Connection, user_id: user::UserID) -> SeriatimResu
 	let u = User::get_by_id(&connection, &user_id)?;
 	let docs = u.get_documents()?;
 
-	Ok(send_success(&docs))
+	let serializable_docs = docs
+		.iter()
+		.map(|d| d.serializable(Some(&user_id)))
+		.collect::<QueryResult<Vec<SerializableDocument>>>()?;
+
+	Ok(send_success(&serializable_docs))
 }
 
 #[derive(Deserialize)]

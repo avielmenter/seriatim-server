@@ -1,4 +1,13 @@
 table! {
+    categories (id) {
+        id -> Uuid,
+        user_id -> Uuid,
+        document_id -> Uuid,
+        category_name -> Text,
+    }
+}
+
+table! {
     documents (id) {
         id -> Uuid,
         user_id -> Uuid,
@@ -30,4 +39,8 @@ table! {
     }
 }
 
-allow_tables_to_appear_in_same_query!(documents, items, users,);
+joinable!(categories -> documents (document_id));
+joinable!(categories -> users (user_id));
+joinable!(documents -> users (user_id));
+
+allow_tables_to_appear_in_same_query!(categories, documents, items, users,);

@@ -1,3 +1,4 @@
+use data::category::Category;
 use data::db::Connection;
 use data::document::{Document, DocumentID};
 use data::item::ItemID;
@@ -26,7 +27,7 @@ fn create_document(connection: Connection, user_id: user::UserID) -> SeriatimRes
 	let u = user::User::get_by_id(&connection, &user_id)?;
 	let doc = u.create_document()?;
 
-	Ok(send_success(&doc))
+	Ok(send_success(&doc.serializable(Some(&user_id))?))
 }
 
 #[route(OPTIONS, "/<_doc_id>")]
@@ -41,12 +42,20 @@ fn delete_document(
 	user_id: user::UserID,
 ) -> SeriatimResult {
 	let mut doc = Document::get_by_id(&connection, &doc_id)?;
-	if !doc.is_owned_by(&user_id) {
-		return Err(Error::InsufficientPermissions);
-	}
 
-	doc.delete()?;
-	Ok(send_success(&doc))
+	if !doc.is_trashed(&user_id)? && doc.can_be_viewed_by(&user_id) {
+		println!("MOVING TO TRASH");
+
+		Category::create(&connection, &doc_id, &user_id, Category::TRASH)?;
+		Ok(send_success(&doc.serializable(Some(&user_id))?))
+	} else if doc.is_owned_by(&user_id) {
+		println!("DELETING DOCUMENT");
+
+		doc.delete()?;
+		Ok(send_success(&doc.serializable(Some(&user_id))?))
+	} else {
+		Err(Error::InsufficientPermissions)
+	}
 }
 
 #[derive(Serialize, Deserialize)]
@@ -72,7 +81,7 @@ fn rename_document(
 	}
 
 	doc.rename(&rename.0.name)?;
-	Ok(send_success(&doc))
+	Ok(send_success(&doc.serializable(Some(&user_id))?))
 }
 
 #[get("/<doc_id>")]
@@ -85,7 +94,7 @@ fn get_document(
 
 	if doc.can_be_viewed_by(&user_id) {
 		Ok(send_with_permissions(
-			&doc.serialize_with_items()?,
+			&doc.serialize_with_items(Some(&user_id))?,
 			&DocumentPermissions {
 				edit: doc.can_be_edited_by(&user_id),
 			},
@@ -101,7 +110,7 @@ fn get_anonymously(doc_id: DocumentID, connection: Connection) -> SeriatimResult
 
 	if doc.can_be_viewed_anonymously() {
 		Ok(send_with_permissions(
-			&doc.serialize_with_items()?,
+			&doc.serialize_with_items(None)?,
 			&DocumentPermissions { edit: false },
 		))
 	} else {
@@ -119,7 +128,7 @@ fn copy_document(
 
 	if doc.can_be_viewed_by(&user_id) {
 		let new_doc = doc.copy_to_user(&user_id)?;
-		Ok(send_success(&new_doc))
+		Ok(send_success(&new_doc.serializable(Some(&user_id))?))
 	} else {
 		Err(Error::InsufficientPermissions)
 	}
@@ -290,8 +299,67 @@ fn public_viewability(
 		Err(Error::InsufficientPermissions)
 	} else {
 		Ok(send_success(
-			&doc.set_publicly_viewable(viewability.publicly_viewable)?,
+			&doc.set_publicly_viewable(viewability.publicly_viewable)?
+				.serializable(Some(&user_id))?,
 		))
+	}
+}
+
+#[derive(Serialize, Deserialize)]
+struct AddCategoryParams {
+	name: String,
+}
+
+#[route(OPTIONS, "/<_doc_id>/categories")]
+fn category_options<'a>(_doc_id: DocumentID) -> rocket::response::Response<'a> {
+	cors_response::<'a>()
+}
+
+#[post(
+	"/<doc_id>/categories",
+	format = "json",
+	data = "<new_category>"
+)]
+fn add_category(
+	doc_id: DocumentID,
+	connection: Connection,
+	user_id: user::UserID,
+	new_category: Json<AddCategoryParams>,
+) -> SeriatimResult {
+	let doc = Document::get_by_id(&connection, &doc_id)?;
+
+	if !doc.can_be_viewed_by(&user_id) {
+		Err(Error::InsufficientPermissions)
+	} else {
+		Category::create(&connection, &doc_id, &user_id, &new_category.name)?;
+		Ok(send_success(&doc.serializable(Some(&user_id))?))
+	}
+}
+
+#[route(OPTIONS, "/<_doc_id>/categories/<_cat_name>")]
+fn delete_category_options<'a>(
+	_doc_id: DocumentID,
+	_cat_name: String,
+) -> rocket::response::Response<'a> {
+	cors_response::<'a>()
+}
+
+#[delete("/<doc_id>/categories/<cat_name>")]
+fn delete_category(
+	doc_id: DocumentID,
+	connection: Connection,
+	user_id: user::UserID,
+	cat_name: String,
+) -> SeriatimResult {
+	let doc = Document::get_by_id(&connection, &doc_id)?;
+
+	if !doc.can_be_viewed_by(&user_id) {
+		Err(Error::InsufficientPermissions)
+	} else {
+		let mut category = Category::get_category(&connection, &doc_id, &user_id, &cat_name)?;
+		category.delete()?;
+
+		Ok(send_success(&doc.serializable(Some(&user_id))?))
 	}
 }
 
@@ -321,6 +389,10 @@ pub fn routes() -> Vec<Route> {
 		edit_document_text,
 		public_viewability_options,
 		public_viewability,
+		category_options,
+		add_category,
+		delete_category_options,
+		delete_category,
 		not_logged_in_get,
 		not_logged_in_post,
 	]

@@ -2,6 +2,7 @@ use diesel;
 use diesel::prelude::*;
 
 use data;
+use data::category::Category;
 use data::db::Connection;
 use data::item::{Item, ItemID};
 use data::schema::documents;
@@ -25,8 +26,13 @@ pub struct Document<'a> {
 	pub data: Data,
 }
 
-pub struct DocumentWithItems<'a> {
+pub struct SerializableDocument<'a> {
 	document: &'a Document<'a>,
+	categories: Vec<Category<'a>>,
+}
+
+pub struct DocumentWithItems<'a> {
+	document: SerializableDocument<'a>,
 	items_hashmap: HashMap<ItemID, Item<'a>>,
 }
 
@@ -272,6 +278,21 @@ impl<'a> Document<'a> {
 		Ok(())
 	}
 
+	pub fn is_trashed(&self, p_user_id: &UserID) -> QueryResult<bool> {
+		let trash_category = Category::get_category(
+			&self.connection,
+			&self.get_id(),
+			&p_user_id,
+			Category::TRASH,
+		);
+
+		match trash_category {
+			Ok(_) => Ok(true),
+			Err(diesel::result::Error::NotFound) => Ok(false),
+			Err(e) => Err(e),
+		}
+	}
+
 	fn get_serialized_title(&self) -> Option<String> {
 		if let Ok(title) = self.get_title() {
 			if title == "" {
@@ -309,7 +330,25 @@ impl<'a> Document<'a> {
 		Ok(self)
 	}
 
-	pub fn serialize_with_items(&'a self) -> QueryResult<DocumentWithItems<'a>> {
+	pub fn serializable(
+		&'a self,
+		p_user_id: Option<&UserID>,
+	) -> QueryResult<SerializableDocument<'a>> {
+		let categories = match p_user_id {
+			Some(uid) => Category::get_categories(&self.connection, &self.get_id(), &uid)?,
+			None => Vec::new(),
+		};
+
+		Ok(SerializableDocument::<'a> {
+			document: &self,
+			categories,
+		})
+	}
+
+	pub fn serialize_with_items(
+		&'a self,
+		p_user_id: Option<&UserID>,
+	) -> QueryResult<DocumentWithItems<'a>> {
 		let items_hashmap = self.get_items()?.into_iter().fold(
 			std::collections::HashMap::new(),
 			|mut acc, i| {
@@ -319,21 +358,22 @@ impl<'a> Document<'a> {
 		);
 
 		Ok(DocumentWithItems::<'a> {
-			document: &self,
+			document: self.serializable(p_user_id)?,
 			items_hashmap,
 		})
 	}
 }
 
 fn serialize_document<'a, S>(
-	document: &Document<'a>,
+	ser_document: &SerializableDocument<'a>,
 	serializer: S,
 	items_hashmap: Option<&HashMap<ItemID, Item>>,
 ) -> Result<S::Ok, S::Error>
 where
 	S: Serializer,
 {
-	let count_fields = 7;
+	let count_fields = 8;
+	let ref document = ser_document.document;
 
 	let mut serialized = serializer.serialize_struct(
 		"Document",
@@ -355,10 +395,12 @@ where
 		serialized.serialize_field("items", ser_items)?;
 	}
 
+	serialized.serialize_field("categories", &ser_document.categories)?;
+
 	serialized.end()
 }
 
-impl<'a> Serialize for Document<'a> {
+impl<'a> Serialize for SerializableDocument<'a> {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
 		S: Serializer,
@@ -372,6 +414,6 @@ impl<'a> Serialize for DocumentWithItems<'a> {
 	where
 		S: Serializer,
 	{
-		serialize_document(self.document, serializer, Some(&self.items_hashmap))
+		serialize_document(&self.document, serializer, Some(&self.items_hashmap))
 	}
 }
