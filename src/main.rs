@@ -2,7 +2,6 @@
 	plugin,
 	decl_macro,
 	custom_derive,
-	custom_attribute,
 	associated_type_defaults
 )]
 #![plugin(rocket_codegen)]
@@ -14,6 +13,7 @@ extern crate dotenv;
 extern crate hmacsha1;
 extern crate rand;
 extern crate reqwest;
+#[macro_use]
 extern crate rocket;
 #[macro_use]
 extern crate rocket_contrib;
