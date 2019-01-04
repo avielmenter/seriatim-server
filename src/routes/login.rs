@@ -8,7 +8,7 @@ use oauth::{LoginMethod, OAuthResponse, OAuthSource};
 use rocket;
 use rocket::http::{Cookie, Cookies};
 use rocket::outcome::IntoOutcome;
-use rocket::request::{FromRequest, Outcome, Request};
+use rocket::request::{Form, FromRequest, Outcome, Request};
 use rocket::response::Response;
 use rocket::{Route, State};
 use routes::io::redirect_response;
@@ -45,10 +45,10 @@ fn get_callback(cfg: &SeriatimConfig, method: &LoginMethod, merge: bool) -> Stri
 		+ if merge { "/merge" } else { "/callback" }
 }
 
-#[get("/<login_method>/callback?<oauth_params>")]
+#[get("/<login_method>/callback?<oauth_params..>")]
 fn login_callback<'a>(
 	login_method: LoginMethod,
-	oauth_params: OAuthResponse,
+	oauth_params: Form<OAuthResponse>,
 	redirect: ReturnURL,
 	mut cookies: Cookies,
 	con: Connection,
@@ -77,10 +77,10 @@ fn login_denied<'a>(_login_method: LoginMethod, redirect: ReturnURL) -> Response
 	redirect_response(redirect.url)
 }
 
-#[get("/<login_method>/merge?<oauth_params>")]
+#[get("/<login_method>/merge?<oauth_params..>")]
 fn login_merge<'a>(
 	login_method: LoginMethod,
-	oauth_params: OAuthResponse,
+	oauth_params: Form<OAuthResponse>,
 	redirect: ReturnURL,
 	con: Connection,
 	//user_id: UserID,
@@ -120,20 +120,21 @@ struct LoginParams {
 	merge: Option<bool>,
 }
 
-#[get("/<login_method>?<redirect>")]
+#[get("/<login_method>?<url>&<merge>")]
 fn login<'a>(
 	login_method: LoginMethod,
-	redirect: LoginParams,
+	url: String,
+	merge: Option<bool>,
 	mut cookies: Cookies,
 	cfg: State<SeriatimConfig>,
 ) -> Response<'a> {
-	let callback = get_callback(&cfg, &login_method, redirect.merge.unwrap_or(false));
+	let callback = get_callback(&cfg, &login_method, merge.unwrap_or(false));
 
 	let mut auth = OAuthSource::create(&login_method, &cfg, callback);
 	let oauth_url = auth.get_redirect_url();
 
 	if let Ok(redirect_url) = oauth_url {
-		cookies.add(Cookie::new(RETURN_URL_COOKIE, redirect.url));
+		cookies.add(Cookie::new(RETURN_URL_COOKIE, url));
 
 		if let Some(user_id) = UserID::from_cookie(&mut cookies) {
 			cookies.add_private(
@@ -153,13 +154,13 @@ fn login<'a>(
 	}
 }
 
-#[get("/logout?<redirect>")]
-fn logout(redirect: LoginParams, mut cookies: Cookies) -> Response {
+#[get("/logout?<url>&<merge>")]
+fn logout(url: String, merge: Option<bool>, mut cookies: Cookies) -> Response {
 	cookies
 		.get_private(UserID::cookie_name())
 		.map(|c| cookies.remove_private(c));
 
-	redirect_response(redirect.url)
+	redirect_response(url)
 }
 
 pub fn routes() -> Vec<Route> {

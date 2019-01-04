@@ -11,7 +11,7 @@ use routes::io::{cors_response, send_success, send_with_permissions, SeriatimRes
 
 use rocket;
 use rocket::Route;
-use rocket_contrib::Json;
+use rocket_contrib::json::Json;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -30,7 +30,7 @@ fn create_document(connection: Connection, user_id: user::UserID) -> SeriatimRes
 	Ok(send_success(&doc.serializable(Some(&user_id))?))
 }
 
-#[route(OPTIONS, "/<_doc_id>")]
+#[options("/<_doc_id>")]
 fn delete_options<'a>(_doc_id: DocumentID) -> rocket::response::Response<'a> {
 	cors_response::<'a>()
 }
@@ -63,7 +63,7 @@ struct RenameDocumentParams {
 	name: String,
 }
 
-#[route(OPTIONS, "/<_doc_id>/rename")]
+#[options("/<_doc_id>/rename")]
 fn rename_options<'a>(_doc_id: DocumentID) -> rocket::response::Response<'a> {
 	cors_response::<'a>()
 }
@@ -149,7 +149,7 @@ struct EditDocumentParams {
 	items: HashMap<String, EditDocumentItem>,
 }
 
-#[route(OPTIONS, "/<_doc_id>/edit")]
+#[options("/<_doc_id>/edit")]
 fn edit_options<'a>(_doc_id: DocumentID) -> rocket::response::Response<'a> {
 	cors_response::<'a>()
 }
@@ -241,7 +241,7 @@ fn edit_document(
 	Ok(send_success(&id_map))
 }
 
-#[route(OPTIONS, "/<_doc_id>/edit_text")]
+#[options("/<_doc_id>/edit_text")]
 fn edit_text_options<'a>(_doc_id: DocumentID) -> rocket::response::Response<'a> {
 	cors_response::<'a>()
 }
@@ -277,7 +277,7 @@ struct DocumentViewabilityParams {
 	publicly_viewable: bool,
 }
 
-#[route(OPTIONS, "/<_doc_id>/public_viewability")]
+#[options("/<_doc_id>/public_viewability")]
 fn public_viewability_options<'a>(_doc_id: DocumentID) -> rocket::response::Response<'a> {
 	cors_response::<'a>()
 }
@@ -310,7 +310,7 @@ struct AddCategoryParams {
 	name: String,
 }
 
-#[route(OPTIONS, "/<_doc_id>/categories")]
+#[options("/<_doc_id>/categories")]
 fn category_options<'a>(_doc_id: DocumentID) -> rocket::response::Response<'a> {
 	cors_response::<'a>()
 }
@@ -336,7 +336,7 @@ fn add_category(
 	}
 }
 
-#[route(OPTIONS, "/<_doc_id>/categories/<_cat_name>")]
+#[options("/<_doc_id>/categories/<_cat_name>")]
 fn delete_category_options<'a>(
 	_doc_id: DocumentID,
 	_cat_name: String,

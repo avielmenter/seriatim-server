@@ -12,6 +12,7 @@ const SCOPES: &'static str = "https://www.googleapis.com/auth/userinfo.profile";
 #[derive(FromForm)]
 pub struct GoogleOAuthResponse {
 	code: String,
+	scope: String
 }
 
 impl FromOAuthResponse for GoogleOAuthResponse {

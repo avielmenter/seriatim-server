@@ -8,7 +8,7 @@ use diesel::result::QueryResult;
 use oauth::LoginMethod;
 
 use rocket::{self, Route};
-use rocket_contrib::Json;
+use rocket_contrib::json::Json;
 
 use routes::error::Error;
 use routes::io::{cors_response, send_success, SeriatimResult};
@@ -39,7 +39,7 @@ struct UpdateUserParams {
 	display_name: String,
 }
 
-#[route(OPTIONS, "/update")]
+#[options("/update")]
 fn update_options<'a>() -> rocket::response::Response<'a> {
 	cors_response::<'a>()
 }

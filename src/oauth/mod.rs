@@ -81,18 +81,23 @@ impl<'f> FromForm<'f> for OAuthResponse {
 	type Error = std::io::Error;
 
 	fn from_form(items: &mut FormItems<'f>, strict: bool) -> Result<OAuthResponse, Self::Error> {
-		let items_str = items.inner_str();
+		let items_str = items
+			.map(|item| item.key_value())
+			.map(|(key, value)| key.to_string() + &String::from("=") + &value.to_string())
+			.fold(String::from(""), |acc, i| acc + &i + &String::from("&"));
+
+		println!("OAuth Params String: {}", items_str);
 
 		if let Ok(twitter_response) =
-			twitter::TwitterOAuthResponse::from_form(&mut FormItems::from(items_str), strict)
+			twitter::TwitterOAuthResponse::from_form(&mut FormItems::from(&items_str[..]), strict)
 		{
 			Ok(OAuthResponse::Twitter(twitter_response))
 		} else if let Ok(google_response) =
-			google::GoogleOAuthResponse::from_form(&mut FormItems::from(items_str), strict)
+			google::GoogleOAuthResponse::from_form(&mut FormItems::from(&items_str[..]), strict)
 		{
 			Ok(OAuthResponse::Google(google_response))
 		} else if let Ok(facebook_response) =
-			facebook::FacebookOAuthResponse::from_form(&mut FormItems::from(items_str), strict)
+			facebook::FacebookOAuthResponse::from_form(&mut FormItems::from(&items_str[..]), strict)
 		{
 			Ok(OAuthResponse::Facebook(facebook_response))
 		} else {

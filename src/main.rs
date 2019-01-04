@@ -1,10 +1,4 @@
-#![feature(
-	plugin,
-	decl_macro,
-	custom_derive,
-	associated_type_defaults
-)]
-#![plugin(rocket_codegen)]
+#![feature(proc_macro_hygiene, decl_macro, associated_type_defaults)]
 
 extern crate base64;
 #[macro_use]
