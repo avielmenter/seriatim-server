@@ -114,12 +114,6 @@ fn merge_denied<'a>(_login_method: LoginMethod, redirect: ReturnURL) -> Response
 	redirect_response(redirect.url)
 }
 
-#[derive(FromForm)]
-struct LoginParams {
-	url: String,
-	merge: Option<bool>,
-}
-
 #[get("/<login_method>?<url>&<merge>")]
 fn login<'a>(
 	login_method: LoginMethod,
@@ -154,6 +148,7 @@ fn login<'a>(
 	}
 }
 
+#[allow(unused_variables)]
 #[get("/logout?<url>&<merge>")]
 fn logout(url: String, merge: Option<bool>, mut cookies: Cookies) -> Response {
 	cookies

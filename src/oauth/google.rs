@@ -9,6 +9,7 @@ use oauth::{FromOAuthResponse, OAuth, OAuthResponse};
 
 const SCOPES: &'static str = "https://www.googleapis.com/auth/userinfo.profile";
 
+#[allow(dead_code)]
 #[derive(FromForm)]
 pub struct GoogleOAuthResponse {
 	code: String,
