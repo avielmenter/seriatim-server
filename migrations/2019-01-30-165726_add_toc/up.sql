@@ -1,0 +1,4 @@
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+ALTER TABLE documents 
+	ADD COLUMN toc_item_id uuid NULL REFERENCES items(id) ON DELETE SET NULL;

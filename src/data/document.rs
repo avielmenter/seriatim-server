@@ -45,6 +45,7 @@ pub struct Data {
 	pub created_at: SystemTime,
 	pub modified_at: Option<SystemTime>,
 	pub publicly_viewable: bool,
+	toc_item_id: Option<uuid::Uuid>,
 }
 
 #[derive(Insertable)]
@@ -313,6 +314,14 @@ impl<'a> Document<'a> {
 		}
 	}
 
+	pub fn get_serialized_toc_id(&self) -> Option<ItemID> {
+		if let Some(toc_id) = self.data.toc_item_id {
+			Some(ItemID::from_uuid(toc_id))
+		} else {
+			None
+		}
+	}
+
 	pub fn delete(&mut self) -> QueryResult<usize> {
 		diesel::delete(documents)
 			.filter(data::schema::documents::dsl::id.eq(&self.data.id))
@@ -326,7 +335,18 @@ impl<'a> Document<'a> {
 			.get_result(&self.connection.pg_connection)?;
 
 		self.data = new_data;
+		Ok(self)
+	}
 
+	pub fn set_toc_item(&mut self, p_toc_item: &Option<ItemID>) -> QueryResult<&mut Self> {
+		let p_toc_item_id = p_toc_item.as_ref().and_then(|t| Some(**t));
+
+		let new_data = diesel::update(documents)
+			.filter(data::schema::documents::dsl::id.eq(&self.data.id))
+			.set(toc_item_id.eq(&p_toc_item_id))
+			.get_result(&self.connection.pg_connection)?;
+
+		self.data = new_data;
 		Ok(self)
 	}
 
@@ -375,7 +395,7 @@ fn serialize_document<'a, S>(
 where
 	S: Serializer,
 {
-	let count_fields = 8;
+	let count_fields = 9;
 	let ref document = ser_document.document;
 
 	let mut serialized = serializer.serialize_struct(
@@ -393,6 +413,7 @@ where
 	serialized.serialize_field("created_at", &document.data.created_at)?;
 	serialized.serialize_field("modified_at", &document.data.modified_at)?;
 	serialized.serialize_field("publicly_viewable", &document.data.publicly_viewable)?;
+	serialized.serialize_field("toc_item_id", &document.get_serialized_toc_id())?;
 
 	if let Some(ser_items) = items_hashmap {
 		serialized.serialize_field("items", ser_items)?;

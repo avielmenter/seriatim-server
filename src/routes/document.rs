@@ -156,6 +156,7 @@ struct EditDocumentItem {
 #[derive(Serialize, Deserialize)]
 struct EditDocumentParams {
 	root_item: String,
+	toc_item: Option<String>,
 	items: HashMap<String, EditDocumentItem>,
 }
 
@@ -260,10 +261,24 @@ fn edit_document(
 	}
 
 	update_root(&mut doc, &subtree)?;
-
 	let id_map = merge_edit_subtree(&mut doc, &subtree, &subtree.root_item, None)?;
 
-	doc.touch()?;
+	println!("UPDATED ITEMS");
+
+	let toc_item_id = match subtree.toc_item {
+		Some(ref t) => id_map.get(t).unwrap_or(&None),
+		None => &None,
+	};
+
+	println!(
+		"SETTING TOC ITEM ID: {}",
+		toc_item_id
+			.as_ref()
+			.and_then(|t| Some(t.hyphenated().to_string()))
+			.unwrap_or("".to_string())
+	);
+
+	doc.set_toc_item(toc_item_id)?.touch()?;
 	Ok(send_success(&id_map))
 }
 

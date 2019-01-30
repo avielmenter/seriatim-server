@@ -81,6 +81,7 @@ table! {
         created_at -> Timestamp,
         modified_at -> Nullable<Timestamp>,
         publicly_viewable -> Bool,
+        toc_item_id -> Nullable<Uuid>,
     }
 }
 
