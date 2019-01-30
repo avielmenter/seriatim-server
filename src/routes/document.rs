@@ -45,13 +45,9 @@ fn delete_document(
 	let mut doc = Document::get_by_id(&connection, &doc_id)?;
 
 	if !doc.is_trashed(&user_id)? && doc.can_be_viewed_by(&user_id) {
-		println!("MOVING TO TRASH");
-
 		Category::create(&connection, &doc_id, &user_id, Category::TRASH)?;
 		Ok(send_success(&doc.serializable(Some(&user_id))?))
 	} else if doc.is_owned_by(&user_id) {
-		println!("DELETING DOCUMENT");
-
 		doc.delete()?;
 		Ok(send_success(&doc.serializable(Some(&user_id))?))
 	} else {
@@ -263,20 +259,10 @@ fn edit_document(
 	update_root(&mut doc, &subtree)?;
 	let id_map = merge_edit_subtree(&mut doc, &subtree, &subtree.root_item, None)?;
 
-	println!("UPDATED ITEMS");
-
 	let toc_item_id = match subtree.toc_item {
 		Some(ref t) => id_map.get(t).unwrap_or(&None),
 		None => &None,
 	};
-
-	println!(
-		"SETTING TOC ITEM ID: {}",
-		toc_item_id
-			.as_ref()
-			.and_then(|t| Some(t.hyphenated().to_string()))
-			.unwrap_or("".to_string())
-	);
 
 	doc.set_toc_item(toc_item_id)?.touch()?;
 	Ok(send_success(&id_map))
