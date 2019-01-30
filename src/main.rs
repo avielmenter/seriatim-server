@@ -3,6 +3,8 @@
 extern crate base64;
 #[macro_use]
 extern crate diesel;
+#[macro_use]
+extern crate diesel_derive_enum;
 extern crate dotenv;
 extern crate hmacsha1;
 extern crate rand;

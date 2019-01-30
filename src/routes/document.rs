@@ -2,6 +2,7 @@ use data::category::Category;
 use data::db::Connection;
 use data::document::{Document, DocumentID};
 use data::item::ItemID;
+use data::schema::{StyleProperty, StyleUnit};
 use data::user;
 
 use diesel::result::QueryResult;
@@ -135,12 +136,21 @@ fn copy_document(
 }
 
 #[derive(Serialize, Deserialize)]
+struct EditDocumentStyle {
+	property: StyleProperty,
+	value_string: Option<String>,
+	value_number: Option<i32>,
+	unit: Option<StyleUnit>,
+}
+
+#[derive(Serialize, Deserialize)]
 struct EditDocumentItem {
 	item_id: String,
 	parent_id: Option<String>,
 	child_order: i32,
 	children: Vec<String>,
 	item_text: Option<String>,
+	styles: Vec<EditDocumentStyle>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -176,22 +186,38 @@ fn merge_edit_subtree<'a>(
 	if let Some(ref parent_id_str) = parent {
 		// add this item, unless it's the root of the subtree
 		if let Ok(parent_uuid) = ItemID::from_str(&parent_id_str) {
-			let new_item = doc.add_item(
+			let mut new_item = doc.add_item(
 				Some(parent_uuid),
 				curr_item.child_order,
 				curr_item.item_text.clone(),
 			)?;
 
+			let db_styles = curr_item
+				.styles
+				.iter()
+				.map(|s| {
+					new_item.create_style(
+						s.property,
+						s.value_string.clone(),
+						s.value_number,
+						s.unit,
+					)
+				})
+				.collect();
+
+			new_item.update_styles(db_styles)?;
+
 			curr_item_id = new_item.get_id();
 		}
 	}
 
-	let mut child_ids = curr_item	// handle children
+	let mut child_ids = curr_item // handle children
 		.children
 		.iter()
 		.map(|child_id| merge_edit_subtree(doc, subtree, child_id, Some(&curr_item_id.json_str())))
-		.fold(Ok(HashMap::<String, Option<ItemID>>::new()),
-			|prev_result : QueryResult<HashMap<String, Option<ItemID>>>, curr_children| {
+		.fold(
+			Ok(HashMap::<String, Option<ItemID>>::new()),
+			|prev_result: QueryResult<HashMap<String, Option<ItemID>>>, curr_children| {
 				let mut prev = prev_result?;
 
 				for (curr_child_id, curr_child) in curr_children?.into_iter() {
@@ -199,7 +225,7 @@ fn merge_edit_subtree<'a>(
 				}
 
 				Ok(prev)
-			}
+			},
 		)?;
 
 	child_ids.insert(curr.to_string(), Some(curr_item_id));
@@ -315,11 +341,7 @@ fn category_options<'a>(_doc_id: DocumentID) -> rocket::response::Response<'a> {
 	cors_response::<'a>()
 }
 
-#[post(
-	"/<doc_id>/categories",
-	format = "json",
-	data = "<new_category>"
-)]
+#[post("/<doc_id>/categories", format = "json", data = "<new_category>")]
 fn add_category(
 	doc_id: DocumentID,
 	connection: Connection,

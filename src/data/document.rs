@@ -4,7 +4,7 @@ use diesel::prelude::*;
 use data;
 use data::category::Category;
 use data::db::Connection;
-use data::item::{Item, ItemID};
+use data::item::{Item, ItemID, ItemWithStyles};
 use data::schema::documents;
 use data::schema::documents::dsl::*;
 use data::schema::items;
@@ -33,7 +33,7 @@ pub struct SerializableDocument<'a> {
 
 pub struct DocumentWithItems<'a> {
 	document: SerializableDocument<'a>,
-	items_hashmap: HashMap<ItemID, Item<'a>>,
+	items_hashmap: HashMap<ItemID, ItemWithStyles<'a>>,
 }
 
 #[derive(Debug, Queryable, Identifiable)]
@@ -229,7 +229,7 @@ impl<'a> Document<'a> {
 				curr_item.data.child_order,
 				Some(curr_item.data.item_text.clone()),
 			)?
-				.get_id()
+			.get_id()
 		};
 
 		self.copy_item_children(&p_items, curr_item.get_id(), Some(new_item_id))?;
@@ -349,13 +349,16 @@ impl<'a> Document<'a> {
 		&'a self,
 		p_user_id: Option<&UserID>,
 	) -> QueryResult<DocumentWithItems<'a>> {
-		let items_hashmap = self.get_items()?.into_iter().fold(
-			std::collections::HashMap::new(),
-			|mut acc, i| {
-				acc.entry(i.get_id()).or_insert(i);
+		let items_hashmap = self
+			.get_items()?
+			.into_iter()
+			.map(|i| ItemWithStyles::from(i))
+			.collect::<QueryResult<Vec<ItemWithStyles>>>()?
+			.into_iter()
+			.fold(std::collections::HashMap::new(), |mut acc, i| {
+				acc.entry(i.item.get_id()).or_insert(i);
 				acc
-			},
-		);
+			});
 
 		Ok(DocumentWithItems::<'a> {
 			document: self.serializable(p_user_id)?,
@@ -367,7 +370,7 @@ impl<'a> Document<'a> {
 fn serialize_document<'a, S>(
 	ser_document: &SerializableDocument<'a>,
 	serializer: S,
-	items_hashmap: Option<&HashMap<ItemID, Item>>,
+	items_hashmap: Option<&HashMap<ItemID, ItemWithStyles>>,
 ) -> Result<S::Ok, S::Error>
 where
 	S: Serializer,

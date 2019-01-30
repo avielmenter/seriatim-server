@@ -1,12 +1,18 @@
 use diesel;
 use diesel::prelude::*;
 
+use data;
 use data::db::Connection;
 use data::document::DocumentID;
 use data::schema::items;
 use data::schema::items::dsl::*;
+use data::schema::styles::dsl::*;
+use data::schema::{StyleProperty, StyleUnit};
+use data::style::{style_vec_to_map, Style};
 
 use serde::ser::{Serialize, SerializeStruct, Serializer};
+
+use std::collections::HashMap;
 
 use uuid;
 
@@ -85,6 +91,23 @@ impl<'a> Item<'a> {
 			.execute(&self.connection.pg_connection)
 	}
 
+	pub fn create_style(
+		&self,
+		p_property: StyleProperty,
+		p_value_string: Option<String>,
+		p_value_number: Option<i32>,
+		p_unit: Option<StyleUnit>,
+	) -> Style<'a> {
+		Style::create(
+			self.connection,
+			&self.get_id(),
+			p_property,
+			p_value_string,
+			p_value_number,
+			p_unit,
+		)
+	}
+
 	pub fn update_text(&mut self, update_text: &str) -> QueryResult<&mut Item<'a>> {
 		let data = diesel::update(items)
 			.filter(id.eq(self.data.id))
@@ -95,6 +118,70 @@ impl<'a> Item<'a> {
 
 		Ok(self)
 	}
+
+	fn add_style(&mut self, style: &Style<'a>) -> QueryResult<Style<'a>> {
+		let data = diesel::insert_into(styles)
+			.values(&style.data)
+			.get_result(&self.connection.pg_connection)?;
+
+		Ok(Style::new(self.connection, data))
+	}
+
+	pub fn update_styles(&mut self, update_styles: Vec<Style<'a>>) -> QueryResult<Vec<Style<'a>>> {
+		let current_properties: Vec<data::schema::StyleProperty> =
+			Style::get_by_item(&self.connection, &self.get_id())?
+				.into_iter()
+				.map(|s| s.data.property)
+				.collect();
+
+		update_styles
+			.into_iter()
+			.map(|mut se| {
+				if current_properties.contains(&se.data.property) {
+					se.update()?;
+					Ok(se)
+				} else {
+					self.add_style(&se)
+				}
+			})
+			.collect()
+	}
+}
+
+fn serialize_item<'a, S>(
+	item: &Item<'a>,
+	serializer: S,
+	styles_map: Option<&HashMap<StyleProperty, Style<'a>>>,
+) -> Result<S::Ok, S::Error>
+where
+	S: Serializer,
+{
+	let mut serialized =
+		serializer.serialize_struct("Item", if styles_map.is_some() { 7 } else { 6 })?;
+	serialized.serialize_field("item_id", &item.get_id())?;
+
+	serialized.serialize_field(
+		"document_id",
+		&item.data.document_id.hyphenated().to_string(),
+	)?;
+
+	serialized.serialize_field(
+		"parent_id",
+		&item
+			.data
+			.parent_id
+			.and_then(|p| Some(p.hyphenated().to_string())),
+	)?;
+
+	serialized.serialize_field("text", &item.data.item_text)?;
+	serialized.serialize_field("child_order", &item.data.child_order)?;
+	serialized.serialize_field("collapsed", &item.data.collapsed)?;
+
+	if let Some(s) = styles_map {
+		serialized.serialize_field("styles", s)?;
+	}
+
+	serialized.end()
 }
 
 impl<'a> Serialize for Item<'a> {
@@ -102,26 +189,31 @@ impl<'a> Serialize for Item<'a> {
 	where
 		S: Serializer,
 	{
-		let mut serialized = serializer.serialize_struct("Item", 6)?;
-		serialized.serialize_field("item_id", &self.get_id())?;
+		serialize_item(self, serializer, None)
+	}
+}
 
-		serialized.serialize_field(
-			"document_id",
-			&self.data.document_id.hyphenated().to_string(),
-		)?;
+pub struct ItemWithStyles<'a> {
+	pub item: Item<'a>,
+	pub styles: HashMap<StyleProperty, Style<'a>>,
+}
 
-		serialized.serialize_field(
-			"parent_id",
-			&self
-				.data
-				.parent_id
-				.and_then(|p| Some(p.hyphenated().to_string())),
-		)?;
+impl<'a> ItemWithStyles<'a> {
+	pub fn from(item: Item<'a>) -> QueryResult<ItemWithStyles<'a>> {
+		let item_styles = Style::get_by_item(&item.connection, &(item.get_id()))?;
 
-		serialized.serialize_field("text", &self.data.item_text)?;
-		serialized.serialize_field("child_order", &self.data.child_order)?;
-		serialized.serialize_field("collapsed", &self.data.collapsed)?;
+		Ok(ItemWithStyles::<'a> {
+			item: item,
+			styles: style_vec_to_map(item_styles),
+		})
+	}
+}
 
-		serialized.end()
+impl<'a> Serialize for ItemWithStyles<'a> {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: Serializer,
+	{
+		serialize_item(&self.item, serializer, Some(&self.styles))
 	}
 }
