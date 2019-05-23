@@ -161,7 +161,7 @@ impl<'a> Document<'a> {
 	}
 
 	pub fn can_be_viewed_by(self: &Document<'a>, p_user_id: &UserID) -> bool {
-		self.data.user_id.eq(&**p_user_id)
+		self.can_be_viewed_anonymously() || self.data.user_id.eq(&**p_user_id)
 	}
 
 	pub fn can_be_viewed_anonymously(&self) -> bool {
