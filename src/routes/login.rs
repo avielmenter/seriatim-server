@@ -53,7 +53,7 @@ fn login_callback<'a>(
 	mut cookies: Cookies,
 	con: Connection,
 	cfg: State<SeriatimConfig>,
-) -> Result<Response<'a>, Box<std::error::Error>> {
+) -> Result<Response<'a>, Box<dyn std::error::Error>> {
 	let callback = get_callback(&cfg, &login_method, false);
 
 	let oauth_user = OAuthSource::create(&login_method, &cfg, callback)
@@ -86,7 +86,7 @@ fn login_merge<'a>(
 	//user_id: UserID,
 	mut cookies: Cookies,
 	cfg: State<SeriatimConfig>,
-) -> Result<Response<'a>, Box<std::error::Error>> {
+) -> Result<Response<'a>, Box<dyn std::error::Error>> {
 	let user_id = match UserID::from_named_cookie(&mut cookies, REDIRECT_USER_COOKIE) {
 		Some(u) => Ok(u),
 		None => Err(super::error::Error::NotLoggedIn),

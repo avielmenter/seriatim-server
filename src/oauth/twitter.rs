@@ -138,7 +138,7 @@ impl OAuth for Twitter {
 	fn get_oauth_token(
 		&mut self,
 		oauth_response: &TwitterOAuthResponse,
-	) -> Result<&mut Twitter, Box<std::error::Error>> {
+	) -> Result<&mut Twitter, Box<dyn std::error::Error>> {
 		const VERIFY_TOKEN_URL: &'static str = "https://api.twitter.com/oauth/access_token";
 
 		let mut params: HashMap<String, String> = HashMap::new();
@@ -162,7 +162,7 @@ impl OAuth for Twitter {
 		Ok(self)
 	}
 
-	fn get_user(&self) -> Result<TwitterUser, Box<std::error::Error>> {
+	fn get_user(&self) -> Result<TwitterUser, Box<dyn std::error::Error>> {
 		const VERIFY_CREDENTIALS_URL: &'static str =
 			"https://api.twitter.com/1.1/account/verify_credentials.json";
 

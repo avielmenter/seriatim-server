@@ -15,7 +15,7 @@ pub enum Error {
 	NotLoggedIn,
 	TooFewLoginMethods,
 	DatabaseError(Box<diesel::result::Error>),
-	OtherError(Box<std::error::Error>),
+	OtherError(Box<dyn std::error::Error>),
 }
 
 impl Error {

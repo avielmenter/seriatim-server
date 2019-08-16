@@ -152,9 +152,9 @@ pub trait OAuth {
 	fn get_oauth_token(
 		&mut self,
 		oauth_response: &Self::TResponse,
-	) -> Result<&mut Self, Box<std::error::Error>>;
+	) -> Result<&mut Self, Box<dyn std::error::Error>>;
 
-	fn get_user(&self) -> Result<Self::TUser, Box<std::error::Error>>;
+	fn get_user(&self) -> Result<Self::TUser, Box<dyn std::error::Error>>;
 }
 
 // OAUTH SOURCE
@@ -199,7 +199,7 @@ impl OAuthSource {
 	pub fn get_oauth_token(
 		&mut self,
 		oauth_response: &OAuthResponse,
-	) -> Result<&mut Self, Box<std::error::Error>> {
+	) -> Result<&mut Self, Box<dyn std::error::Error>> {
 		match self {
 			OAuthSource::Google(g) => {
 				let r =
@@ -223,7 +223,7 @@ impl OAuthSource {
 		Ok(self)
 	}
 
-	pub fn get_user(&self) -> Result<OAuthUser, Box<std::error::Error>> {
+	pub fn get_user(&self) -> Result<OAuthUser, Box<dyn std::error::Error>> {
 		match self {
 			OAuthSource::Google(g) => Ok(OAuthUser::from(g.get_user()?)),
 			OAuthSource::Twitter(t) => Ok(OAuthUser::from(t.get_user()?)),

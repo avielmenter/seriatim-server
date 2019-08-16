@@ -62,7 +62,7 @@ impl OAuth for Facebook {
 	fn get_oauth_token(
 		&mut self,
 		oauth_response: &Self::TResponse,
-	) -> Result<&mut Self, Box<std::error::Error>> {
+	) -> Result<&mut Self, Box<dyn std::error::Error>> {
 		const OAUTH_TOKEN_URL: &'static str = "https://graph.facebook.com/v3.0/oauth/access_token?";
 
 		let token_request_url = OAUTH_TOKEN_URL.to_string()
@@ -85,7 +85,7 @@ impl OAuth for Facebook {
 		Ok(self)
 	}
 
-	fn get_user(&self) -> Result<FacebookUser, Box<std::error::Error>> {
+	fn get_user(&self) -> Result<FacebookUser, Box<dyn std::error::Error>> {
 		const USER_INFO_URL: &'static str = "https://graph.facebook.com/me?";
 		let info_url = USER_INFO_URL.to_string()
 			+ "access_token="

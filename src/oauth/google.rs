@@ -92,7 +92,7 @@ impl OAuth for Google {
 	fn get_oauth_token(
 		&mut self,
 		oauth_response: &GoogleOAuthResponse,
-	) -> Result<&mut Google, Box<std::error::Error>> {
+	) -> Result<&mut Google, Box<dyn std::error::Error>> {
 		const OAUTH_TOKEN_URL: &'static str = "https://www.googleapis.com/oauth2/v4/token";
 
 		let mut body_params: HashMap<String, String> = HashMap::new();
@@ -116,7 +116,7 @@ impl OAuth for Google {
 		Ok(self)
 	}
 
-	fn get_user(&self) -> Result<GoogleUser, Box<std::error::Error>> {
+	fn get_user(&self) -> Result<GoogleUser, Box<dyn std::error::Error>> {
 		const GET_USER_URL: &'static str =
 			"https://people.googleapis.com/v1/people/me?requestMask.includeField=person.names";
 
