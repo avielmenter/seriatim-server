@@ -118,7 +118,7 @@ impl OAuth for Twitter {
 
         let response = self
             .generate_request(
-                reqwest::Method::Post,
+                reqwest::Method::POST,
                 REQUEST_TOKEN_URL.to_string(),
                 params,
                 HashMap::new(),
@@ -152,7 +152,7 @@ impl OAuth for Twitter {
 
         let response = self
             .generate_request(
-                reqwest::Method::Post,
+                reqwest::Method::POST,
                 VERIFY_TOKEN_URL.to_string(),
                 params,
                 HashMap::new(),
@@ -169,7 +169,7 @@ impl OAuth for Twitter {
 
         let response: String = self
             .generate_request(
-                reqwest::Method::Get,
+                reqwest::Method::GET,
                 VERIFY_CREDENTIALS_URL.to_string(),
                 HashMap::new(),
                 HashMap::new(),
@@ -194,18 +194,7 @@ impl OAuth for Twitter {
 
 impl<'a> TwitterRequest<'a> {
     fn get_http_method_string(method: &reqwest::Method) -> String {
-        match method {
-            reqwest::Method::Options => "OPTIONS".to_string(),
-            reqwest::Method::Get => "GET".to_string(),
-            reqwest::Method::Post => "POST".to_string(),
-            reqwest::Method::Put => "PUT".to_string(),
-            reqwest::Method::Delete => "DELETE".to_string(),
-            reqwest::Method::Head => "HEAD".to_string(),
-            reqwest::Method::Trace => "TRACE".to_string(),
-            reqwest::Method::Connect => "CONNECT".to_string(),
-            reqwest::Method::Patch => "PATCH".to_string(),
-            reqwest::Method::Extension(ext) => ext.clone(),
-        }
+        method.as_str().to_string()
     }
 
     fn url_encode(val: &str) -> String {
@@ -252,7 +241,7 @@ impl<'a> TwitterRequest<'a> {
         base64::encode(&hashed)
     }
 
-    fn build_auth_header(&self) -> reqwest::header::Headers {
+    fn build_auth_header(&self) -> String {
         let mut request_params = self.header_params.clone();
 
         request_params.insert(
@@ -295,10 +284,13 @@ impl<'a> TwitterRequest<'a> {
                     acc + comma + &x
                 });
 
-        let mut headers = reqwest::header::Headers::new();
+        header_string
+        /*
+        let mut headers = hyper::header::Headers::new();
         headers.set(reqwest::header::Authorization(header_string.clone()));
 
         headers
+        */
     }
 
     fn get_body_string(&self) -> String {
@@ -319,7 +311,7 @@ impl<'a> TwitterRequest<'a> {
 
         http_client
             .request(self.method.clone(), &self.url)
-            .headers(self.build_auth_header())
+            .header("Authorization", self.build_auth_header())
             .body(self.get_body_string())
             .send()?
             .text()

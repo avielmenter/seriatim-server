@@ -4,10 +4,10 @@ extern crate syn;
 #[macro_use]
 extern crate quote;
 
-fn impl_tagged_id(ast: &syn::DeriveInput) -> quote::Tokens {
+fn impl_tagged_id(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
     let name = &ast.ident;
 
-    quote! {
+    let gen = quote! {
         use rand;
         use rocket;
         use rocket::outcome::IntoOutcome;
@@ -144,15 +144,13 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> quote::Tokens {
                 serializer.serialize_str(&self.0.hyphenated().to_string())
             }
         }
-    }
+    };
+
+    gen.into()
 }
 
 #[proc_macro_derive(TaggedID)]
 pub fn tagged_id(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let s = input.to_string();
-    let ast = syn::parse_derive_input(&s).unwrap();
-
-    let gen = impl_tagged_id(&ast);
-
-    gen.parse().unwrap()
+    let ast = syn::parse(input).unwrap();
+    impl_tagged_id(&ast)
 }

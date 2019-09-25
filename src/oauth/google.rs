@@ -104,7 +104,7 @@ impl OAuth for Google {
 
         let response = OAuthRequest::create(
             OAUTH_TOKEN_URL.to_string(),
-            reqwest::Method::Post,
+            reqwest::Method::POST,
             body_params,
         )
         .get_response()?;
@@ -129,7 +129,7 @@ impl OAuth for Google {
         let url =
             GET_USER_URL.to_string() + "&key=" + &self.api_key + "&access_token=" + &access_token;
 
-        let response = OAuthRequest::create(url.clone(), reqwest::Method::Get, HashMap::new())
+        let response = OAuthRequest::create(url.clone(), reqwest::Method::GET, HashMap::new())
             .get_response()?;
 
         let u: GoogleUserRaw = serde_json::from_str(&response)?;

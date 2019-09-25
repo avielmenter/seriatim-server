@@ -76,7 +76,7 @@ impl OAuth for Facebook {
             + &oauth_response.code;
 
         let response =
-            OAuthRequest::create(token_request_url, reqwest::Method::Get, HashMap::new())
+            OAuthRequest::create(token_request_url, reqwest::Method::GET, HashMap::new())
                 .get_response()?;
 
         let token: FacebookTokenResponse = serde_json::from_str(&response)?;
@@ -95,7 +95,7 @@ impl OAuth for Facebook {
         println!("REQUESTING FACEBOOK USER INFO: {}", info_url);
 
         let response =
-            OAuthRequest::create(info_url, reqwest::Method::Get, HashMap::new()).get_response()?;
+            OAuthRequest::create(info_url, reqwest::Method::GET, HashMap::new()).get_response()?;
 
         println!("FACEBOOK USER RESPONSE: {}", response);
 
