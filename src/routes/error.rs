@@ -33,18 +33,6 @@ impl Error {
     }
 }
 
-impl std::error::Error for Error {
-    fn description(&self) -> &str {
-        match self {
-            Error::InsufficientPermissions => "Insufficient Permissions",
-            Error::NotLoggedIn => "must be logged in to access this url",
-            Error::TooFewLoginMethods => "must always have at least one way to log in",
-            Error::DatabaseError(e) => e.description(),
-            Error::OtherError(e) => e.description(),
-        }
-    }
-}
-
 impl<'r> Responder<'r> for Error {
     fn respond_to(self, _: &Request) -> response::Result<'r> {
         Response::build()

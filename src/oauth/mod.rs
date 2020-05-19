@@ -86,8 +86,6 @@ impl<'f> FromForm<'f> for OAuthResponse {
             .map(|(key, value)| key.to_string() + &String::from("=") + &value.to_string())
             .fold(String::from(""), |acc, i| acc + &i + &String::from("&"));
 
-        println!("OAuth Params String: {}", items_str);
-
         if let Ok(twitter_response) =
             twitter::TwitterOAuthResponse::from_form(&mut FormItems::from(&items_str[..]), strict)
         {
