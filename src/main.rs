@@ -13,6 +13,7 @@ extern crate reqwest;
 extern crate rocket;
 #[macro_use]
 extern crate rocket_contrib;
+extern crate rocket_cors;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -24,7 +25,6 @@ extern crate uuid;
 extern crate seriatim_codegen;
 
 mod config;
-mod cors;
 mod data;
 mod oauth;
 mod routes;
@@ -41,12 +41,20 @@ fn main() {
     let document_routes = routes::document::routes();
     let user_routes = routes::user::routes();
 
+    let cors = rocket_cors::CorsOptions::default()
+        .allow_credentials(true)
+        .allowed_origins(rocket_cors::AllowedOrigins::some_exact(&[
+            &cfg.allowed_origin
+        ]))
+        .to_cors()
+        .unwrap();
+
     rocket::ignite()
         .manage(data::db::init_pool(&cfg))
         .manage(cfg)
         .mount("/document", document_routes)
         .mount("/login", login_routes)
         .mount("/user", user_routes)
-        .attach(cors::CORS())
+        .attach(cors)
         .launch();
 }
