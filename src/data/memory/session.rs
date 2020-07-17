@@ -1,7 +1,6 @@
 use data::memory::redis::Connection;
 use data::user::UserID;
 
-use r2d2_redis::redis;
 use r2d2_redis::redis::{Commands, RedisResult};
 use r2d2_redis::{r2d2, RedisConnectionManager};
 
@@ -84,16 +83,16 @@ impl Session {
         Ok(session)
     }
 
-    pub fn check_ip(self, ip: &IpAddr) -> RedisResult<Self> {
-        if self.data.ip == *ip {
-            Ok(self)
-        } else {
-            Err(redis::RedisError::from(std::io::Error::new(
-                std::io::ErrorKind::PermissionDenied,
-                "Invalid IP address for this session",
-            )))
-        }
-    }
+    // pub fn check_ip(self, ip: &IpAddr) -> RedisResult<Self> {
+    //     if self.data.ip == *ip {
+    //         Ok(self)
+    //     } else {
+    //         Err(redis::RedisError::from(std::io::Error::new(
+    //             std::io::ErrorKind::PermissionDenied,
+    //             "Invalid IP address for this session",
+    //         )))
+    //     }
+    // }
 
     pub fn create_user_index(&mut self) -> RedisResult<()> {
         self.get_connection()?
