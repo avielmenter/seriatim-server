@@ -2546,6 +2546,7 @@ checksum = "e1436e58182935dcd9ce0add9ea0b558e8a87befe01c1a301e6020aeb0876363"
 dependencies = [
  "cfg-if",
  "rand 0.4.6",
+ "serde",
 ]
 
 [[package]]

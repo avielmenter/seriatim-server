@@ -18,7 +18,7 @@ use serde::ser::{Serialize, SerializeStruct, Serializer};
 use std::collections::HashMap;
 use std::time::SystemTime;
 
-#[derive(TaggedID)]
+#[derive(TaggedID, Serialize, Deserialize)]
 pub struct DocumentID(uuid::Uuid);
 
 pub struct Document<'a> {

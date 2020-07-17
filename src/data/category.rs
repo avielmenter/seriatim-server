@@ -1,6 +1,3 @@
-#[derive(TaggedID)]
-pub struct CategoryID(uuid::Uuid);
-
 use diesel;
 use diesel::prelude::*;
 
@@ -13,6 +10,9 @@ use data::user::UserID;
 use uuid;
 
 use serde::ser::{Serialize, SerializeStruct, Serializer};
+
+#[derive(TaggedID, Serialize, Deserialize)]
+pub struct CategoryID(uuid::Uuid);
 
 pub struct Category<'a> {
     connection: &'a Connection,

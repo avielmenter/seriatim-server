@@ -13,6 +13,7 @@ pub struct SeriatimConfig {
     pub fb_secret: String,
     pub allowed_origin: String,
     pub session_domain: String,
+    pub max_user_sessions: Option<usize>,
     pub database_url: String,
     pub redis_url: String,
 }
@@ -31,6 +32,9 @@ impl SeriatimConfig {
             fb_secret: env::var("SERIATIM_FB_SECRET").unwrap(),
             allowed_origin: env::var("SERIATIM_ALLOWED_ORIGIN").unwrap(),
             session_domain: env::var("SERIATIM_SESSION_DOMAIN").unwrap(),
+            max_user_sessions: env::var("SERIATIM_MAX_USER_SESSIONS")
+                .ok()
+                .and_then(|v| v.parse::<usize>().ok()),
             database_url: env::var("DATABASE_URL").unwrap(),
             redis_url: env::var("REDIS_URL").unwrap(),
         }
@@ -39,18 +43,31 @@ impl SeriatimConfig {
 
 impl fmt::Display for SeriatimConfig {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "    => seriatim_domain:         {}", self.domain)?;
-        writeln!(f, "    => seriatim_client:         {}", self.client)?;
-        writeln!(f, "    => seriatim_twitter_key:    set")?;
-        writeln!(f, "    => seriatim_twitter_secret: set")?;
-        writeln!(f, "    => seriatim_google_id:      set")?;
-        writeln!(f, "    => seriatim_google_secret:  set")?;
-        writeln!(f, "    => seriatim_google_api_key: set")?;
-        writeln!(f, "    => seriatim_fb_id:          set")?;
-        writeln!(f, "    => seriatim_fb_secret:      set")?;
-        writeln!(f, "    => seriatim_session_domain: {}", self.session_domain)?;
-        writeln!(f, "    => seriatim_allowed_origin: {}", self.allowed_origin)?;
-        writeln!(f, "    => database_url:            set")?;
-        write!(f, "    => redis_url:               set")
+        writeln!(f, "    => seriatim_domain:            {}", self.domain)?;
+        writeln!(f, "    => seriatim_client:            {}", self.client)?;
+        writeln!(f, "    => seriatim_twitter_key:       set")?;
+        writeln!(f, "    => seriatim_twitter_secret:    set")?;
+        writeln!(f, "    => seriatim_google_id:         set")?;
+        writeln!(f, "    => seriatim_google_secret:     set")?;
+        writeln!(f, "    => seriatim_google_api_key:    set")?;
+        writeln!(f, "    => seriatim_fb_id:             set")?;
+        writeln!(f, "    => seriatim_fb_secret:         set")?;
+        writeln!(
+            f,
+            "    => seriatim_session_domain:    {}",
+            self.session_domain
+        )?;
+        writeln!(
+            f,
+            "    => seriatim_allowed_origin:    {}",
+            self.allowed_origin
+        )?;
+        writeln!(
+            f,
+            "    => seriatim_max_user_sessions: {}",
+            self.max_user_sessions.unwrap_or(0),
+        )?;
+        writeln!(f, "    => database_url:               set")?;
+        write!(f, "    => redis_url:                  set")
     }
 }

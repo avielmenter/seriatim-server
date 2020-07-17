@@ -27,45 +27,16 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
                     .fold(String::new(), |acc, x| acc + &x)
             }
 
-            pub fn cookie_name() -> &'static str {
-                stringify!(#name)
-            }
-
             pub fn from_uuid(uuid: uuid::Uuid) -> Self {
                 #name(uuid)
             }
 
-            pub fn cookie_value(&self) -> String {
-                self.0.hyphenated().to_string().clone() + &"!" + &Self::get_salt()
-            }
-
-            pub fn to_cookie(&self) -> rocket::http::Cookie<'static> {
-                rocket::http::Cookie::new(Self::cookie_name(), self.cookie_value())
-            }
-
-            pub fn to_named_cookie(&self, name: &'static str) -> rocket::http::Cookie<'static> {
-                rocket::http::Cookie::new(name, self.cookie_value())
-            }
-
-            pub fn from_named_cookie(cookies: &mut rocket::http::Cookies, name: &'static str) -> Option<Self> {
-                cookies
-                    .get_private(name)
-                    .and_then(|c_hash| {
-                        let c_str = c_hash.value();
-                        let bang_index = c_str.find('!')?;
-
-                        Some(c_str.chars().take(bang_index).collect::<String>())
-                    })
-                    .and_then(|ref c_id| uuid::Uuid::parse_str(c_id).ok())
-                    .and_then(|uuid| Some(Self::from_uuid(uuid)))
-            }
-
-            pub fn from_cookie(cookies: &mut rocket::http::Cookies) -> Option<Self> {
-                Self::from_named_cookie(cookies, Self::cookie_name())
-            }
-
             pub fn json_str(&self) -> String {
                 self.0.hyphenated().to_string()
+            }
+
+            pub fn tag_type() -> &'static str {
+                stringify!(#name)
             }
         }
 
@@ -84,6 +55,43 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
                 }?;
 
                 Ok(Self::from_uuid(uuid))
+            }
+        }
+
+        impl r2d2_redis::redis::ToRedisArgs for #name {
+            fn write_redis_args<W: ?Sized + r2d2_redis::redis::RedisWrite>(&self, out: &mut W) {
+               self.to_string().write_redis_args(out)
+            }
+        }
+
+        impl r2d2_redis::redis::ToRedisArgs for &#name {
+            fn write_redis_args<W: ?Sized + r2d2_redis::redis::RedisWrite>(&self, out: &mut W) {
+                self.to_string().write_redis_args(out)
+            }
+        }
+
+        impl r2d2_redis::redis::FromRedisValue for #name {
+            fn from_redis_value(v: &r2d2_redis::redis::Value) -> r2d2_redis::redis::RedisResult<Self> {
+                let string_value = String::from_redis_value(v)?;
+
+                let err: r2d2_redis::redis::RedisError =
+                    r2d2_redis::redis::RedisError::from(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Cannot convert the requested data to the specified type.",
+                    ));
+                let r = "^".to_string()
+                    + Self::tag_type()
+                    + r" \( ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) \)";
+                let re_result = regex::Regex::new(&r);
+                if let Ok(re) = re_result {
+                    re.captures(&string_value)
+                        .and_then(|caps| caps.get(1))
+                        .and_then(|cap| uuid::Uuid::parse_str(cap.as_str()).ok())
+                        .and_then(|uuid| Some(Self::from_uuid(uuid)))
+                        .ok_or(err)
+                } else {
+                    Err(err)
+                }
             }
         }
 
@@ -122,43 +130,6 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
             }
         }
 
-        impl r2d2_redis::redis::ToRedisArgs for #name {
-            fn write_redis_args<W: ?Sized + r2d2_redis::redis::RedisWrite>(&self, out: &mut W) {
-               self.to_string().write_redis_args(out)
-            }
-        }
-        impl r2d2_redis::redis::ToRedisArgs for &#name {
-            fn write_redis_args<W: ?Sized + r2d2_redis::redis::RedisWrite>(&self, out: &mut W) {
-                self.to_string().write_redis_args(out)
-            }
-        }
-
-        impl r2d2_redis::redis::FromRedisValue for #name {
-            fn from_redis_value(v: &r2d2_redis::redis::Value) -> r2d2_redis::redis::RedisResult<Self> {
-                let string_value = String::from_redis_value(v)?;
-
-                let err: r2d2_redis::redis::RedisError =
-                    r2d2_redis::redis::RedisError::from(std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "Cannot convert the requested data to the specified type.",
-                    ));
-
-                let r = "^".to_string()
-                    + Self::cookie_name()
-                    + r" \( ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) \)";
-                let re_result = regex::Regex::new(&r);
-                if let Ok(re) = re_result {
-                    re.captures(&string_value)
-                        .and_then(|caps| caps.get(1))
-                        .and_then(|cap| uuid::Uuid::parse_str(cap.as_str()).ok())
-                        .and_then(|uuid| Some(Self::from_uuid(uuid)))
-                        .ok_or(err)
-                } else {
-                    Err(err)
-                }
-            }
-        }
-
         impl std::cmp::PartialEq for #name {
             fn eq(&self, other: &Self) -> bool {
                 self.0 == other.0
@@ -171,15 +142,6 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
             fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
                 stringify!(#name).hash(state);
                 self.0.hash(state);
-            }
-        }
-
-        impl serde::ser::Serialize for #name {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where
-                S: serde::ser::Serializer,
-            {
-                serializer.serialize_str(&self.0.hyphenated().to_string())
             }
         }
     };
@@ -197,6 +159,41 @@ fn impl_cookie_guard(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
     let name = &ast.ident;
 
     let gen = quote! {
+        impl #name {
+            pub fn cookie_name() -> &'static str {
+                stringify!(#name)
+            }
+
+            pub fn cookie_value(&self) -> String {
+                self.0.hyphenated().to_string().clone() + &"!" + &Self::get_salt()
+            }
+
+            pub fn to_cookie(&self) -> rocket::http::Cookie<'static> {
+                rocket::http::Cookie::new(Self::cookie_name(), self.cookie_value())
+            }
+
+            pub fn to_named_cookie(&self, name: &'static str) -> rocket::http::Cookie<'static> {
+                rocket::http::Cookie::new(name, self.cookie_value())
+            }
+
+            pub fn from_named_cookie(cookies: &mut rocket::http::Cookies, name: &'static str) -> Option<Self> {
+                cookies
+                    .get_private(name)
+                    .and_then(|c_hash| {
+                        let c_str = c_hash.value();
+                        let bang_index = c_str.find('!')?;
+
+                        Some(c_str.chars().take(bang_index).collect::<String>())
+                    })
+                    .and_then(|ref c_id| uuid::Uuid::parse_str(c_id).ok())
+                    .and_then(|uuid| Some(Self::from_uuid(uuid)))
+            }
+
+            pub fn from_cookie(cookies: &mut rocket::http::Cookies) -> Option<Self> {
+                Self::from_named_cookie(cookies, Self::cookie_name())
+            }
+        }
+
         impl<'a, 'r> rocket::request::FromRequest<'a, 'r> for #name {
             type Error = ();
 
@@ -215,4 +212,56 @@ fn impl_cookie_guard(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
 pub fn cookie_guard(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = syn::parse(input).unwrap();
     impl_cookie_guard(&ast)
+}
+
+fn impl_redis_data(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
+    let name = &ast.ident;
+
+    let gen = quote! {
+        use serde_json;
+        use r2d2_redis::redis::ToRedisArgs;
+
+        fn write_redis<W: ?Sized + r2d2_redis::redis::RedisWrite>(obj: &#name, out: &mut W) {
+            let data_str = serde_json::ser::to_string(obj).or(Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Data are not in the right format.",
+            )));
+
+            if let Ok(s) = data_str {
+                s.to_string().write_redis_args(out)
+            }
+        }
+
+        impl r2d2_redis::redis::ToRedisArgs for #name {
+            fn write_redis_args<W: ?Sized + r2d2_redis::redis::RedisWrite>(&self, out: &mut W) {
+                write_redis(self, out)
+            }
+        }
+        impl r2d2_redis::redis::ToRedisArgs for &#name {
+            fn write_redis_args<W: ?Sized + r2d2_redis::redis::RedisWrite>(&self, out: &mut W) {
+                write_redis(*self, out)
+            }
+        }
+        impl r2d2_redis::redis::FromRedisValue for #name {
+            fn from_redis_value(v: &r2d2_redis::redis::Value) -> r2d2_redis::redis::RedisResult<Self> {
+                let string_value = String::from_redis_value(v)?;
+                let err: r2d2_redis::redis::RedisError =
+                    r2d2_redis::redis::RedisError::from(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Cannot convert the requested data to the specified type.",
+                    ));
+                serde_json::from_str(&string_value)
+                    .and_then(|data| Ok(data))
+                    .or(Err(err))
+            }
+        }
+    };
+
+    gen.into()
+}
+
+#[proc_macro_derive(RedisData)]
+pub fn redis_data(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let ast = syn::parse(input).unwrap();
+    impl_redis_data(&ast)
 }

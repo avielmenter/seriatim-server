@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 use uuid;
 
-#[derive(TaggedID)]
+#[derive(TaggedID, Serialize, Deserialize)]
 pub struct ItemID(uuid::Uuid);
 
 pub struct Item<'a> {

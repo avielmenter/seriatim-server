@@ -2,9 +2,8 @@ use config::SeriatimConfig;
 
 use data::db::Connection;
 use data::memory;
-use data::memory::session;
-use data::memory::session::SessionID;
-use data::user::{User, UserID};
+use data::memory::session::{Session, SessionID};
+use data::user::User;
 
 use oauth::{LoginMethod, OAuthResponse, OAuthSource};
 
@@ -15,6 +14,9 @@ use rocket::request::{Form, FromRequest, Outcome, Request};
 use rocket::{Route, State};
 
 use routes::io::{send_success, SeriatimResult};
+
+use std::net::IpAddr;
+use std::rc::Rc;
 
 const RETURN_URL_COOKIE: &'static str = "redirect_url";
 const REDIRECT_USER_COOKIE: &'static str = "redirect_user_id";
@@ -40,6 +42,20 @@ impl<'a, 'r> FromRequest<'a, 'r> for ReturnURL {
     }
 }
 
+#[derive(Serialize)]
+struct ClientIP(IpAddr);
+
+impl<'a, 'r> FromRequest<'a, 'r> for ClientIP {
+    type Error = ();
+
+    fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
+        request
+            .client_ip()
+            .and_then(|ip| Some(ClientIP(ip)))
+            .or_forward(())
+    }
+}
+
 fn get_callback(cfg: &SeriatimConfig, method: &LoginMethod, merge: bool) -> String {
     cfg.client.clone()
         + "login/"
@@ -49,6 +65,7 @@ fn get_callback(cfg: &SeriatimConfig, method: &LoginMethod, merge: bool) -> Stri
 
 #[get("/<login_method>/callback?<oauth_params..>")]
 fn login_callback<'a>(
+    client_ip: ClientIP,
     login_method: LoginMethod,
     oauth_params: Form<OAuthResponse>,
     redirect: ReturnURL,
@@ -68,10 +85,15 @@ fn login_callback<'a>(
         Err(_) => User::create_from_oauth_user(&con, &oauth_user),
     }?;
 
-    let user_id = db_user.get_id();
-    let session = session::Session::create(redis, &user_id)?;
+    let con = Rc::new(redis);
 
-    let session_id_cookie = session.session_id.to_cookie();
+    let user_id = db_user.get_id();
+    let session = Session::create(con.clone(), &user_id, &client_ip.0)?;
+
+    if let Some(max) = cfg.max_user_sessions {
+        Session::trim_oldest_sessions(con.clone(), &user_id, max)?;
+    }
+    let session_id_cookie = session.data.session_id.to_cookie();
     cookies.add_private(session_id_cookie);
 
     Ok(send_success(&ReturnURL { url: redirect.url }))
@@ -84,19 +106,25 @@ fn login_denied<'a>(_login_method: LoginMethod, redirect: ReturnURL) -> Seriatim
 
 #[get("/<login_method>/merge?<oauth_params..>")]
 fn login_merge<'a>(
+    ip_addr: ClientIP,
     login_method: LoginMethod,
     oauth_params: Form<OAuthResponse>,
     redirect: ReturnURL,
     con: Connection,
+    redis: memory::redis::Connection,
     mut cookies: Cookies,
     cfg: State<SeriatimConfig>,
 ) -> SeriatimResult {
-    let user_id = match UserID::from_named_cookie(&mut cookies, REDIRECT_USER_COOKIE) {
+    let redirect_session_id = match SessionID::from_named_cookie(&mut cookies, REDIRECT_USER_COOKIE)
+    {
         Some(u) => Ok(u),
         None => Err(super::error::Error::NotLoggedIn),
     }?;
 
-    let mut merge_into = User::get_by_id(&con, &user_id)?;
+    let redirect_session =
+        Session::get_by_id(Rc::new(redis), &redirect_session_id)?.check_ip(&ip_addr.0)?;
+
+    let mut merge_into = User::get_by_id(&con, &redirect_session.data.user_id)?;
 
     let callback = get_callback(&cfg, &login_method, true);
     let oauth_user = OAuthSource::create(&login_method, &cfg, callback)
@@ -133,10 +161,10 @@ fn login<'a>(
 
     cookies.add(Cookie::new(RETURN_URL_COOKIE, url));
 
-    if let Some(user_id) = UserID::from_cookie(&mut cookies) {
+    if let Some(session_id) = SessionID::from_cookie(&mut cookies) {
         cookies.add_private(
             // have to set samesite policy so cookie is still around after the redirect
-            Cookie::build(REDIRECT_USER_COOKIE, user_id.cookie_value())
+            Cookie::build(REDIRECT_USER_COOKIE, session_id.cookie_value())
                 .http_only(false)
                 .same_site(rocket::http::SameSite::Lax)
                 .finish(),

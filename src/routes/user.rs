@@ -16,19 +16,21 @@ use routes::io::{cors_response, send_success, SeriatimResult};
 use std;
 
 #[get("/current")]
-fn current_user(connection: Connection, session: Session) -> SeriatimResult {
-    let u = User::get_by_id(&connection, &session.user_id)?;
+fn current_user(connection: Connection, mut session: Session) -> SeriatimResult {
+    let u = User::get_by_id(&connection, &session.data.user_id)?;
+    session.update_login_time()?;
+
     Ok(send_success(&u))
 }
 
 #[get("/documents")]
 fn list_documents(connection: Connection, session: Session) -> SeriatimResult {
-    let u = User::get_by_id(&connection, &session.user_id)?;
+    let u = User::get_by_id(&connection, &session.data.user_id)?;
     let docs = u.get_documents()?;
 
     let serializable_docs = docs
         .iter()
-        .map(|d| d.serializable(Some(&session.user_id)))
+        .map(|d| d.serializable(Some(&session.data.user_id)))
         .collect::<QueryResult<Vec<SerializableDocument>>>()?;
 
     Ok(send_success(&serializable_docs))
@@ -50,7 +52,7 @@ fn update_user(
     session: Session,
     update_params: Json<UpdateUserParams>,
 ) -> SeriatimResult {
-    let mut u = User::get_by_id(&con, &session.user_id)?;
+    let mut u = User::get_by_id(&con, &session.data.user_id)?;
     u.update_display_name(&update_params.display_name)?;
 
     Ok(send_success(&u))
@@ -58,7 +60,7 @@ fn update_user(
 
 #[post("/remove_login/<login_method>")]
 fn remove_login(con: Connection, session: Session, login_method: LoginMethod) -> SeriatimResult {
-    let mut u = User::get_by_id(&con, &session.user_id)?;
+    let mut u = User::get_by_id(&con, &session.data.user_id)?;
 
     if u.count_login_methods() <= 1 {
         Err(Error::TooFewLoginMethods)

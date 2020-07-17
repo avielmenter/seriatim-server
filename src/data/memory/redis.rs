@@ -6,7 +6,7 @@ use rocket::http::Status;
 use rocket::request::{self, FromRequest};
 use rocket::{Outcome, Request, State};
 
-use std::sync::RwLock;
+use std::sync::Mutex;
 
 type RedisPool = r2d2::Pool<RedisConnectionManager>;
 
@@ -17,7 +17,7 @@ pub fn init_pool(cfg: &SeriatimConfig) -> Result<RedisPool, Box<dyn std::error::
 }
 
 pub struct Connection {
-    pub redis_connection: RwLock<r2d2::PooledConnection<RedisConnectionManager>>,
+    pub redis_connection: Mutex<r2d2::PooledConnection<RedisConnectionManager>>,
 }
 
 impl<'a, 'r> FromRequest<'a, 'r> for Connection {
@@ -27,7 +27,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for Connection {
         let pool = request.guard::<State<RedisPool>>()?;
         match pool.get() {
             Ok(redis_connection) => Outcome::Success(Connection {
-                redis_connection: RwLock::new(redis_connection),
+                redis_connection: Mutex::new(redis_connection),
             }),
             Err(_) => Outcome::Failure((Status::ServiceUnavailable, ())),
         }

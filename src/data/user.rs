@@ -17,7 +17,7 @@ use serde::ser::{Serialize, SerializeStruct, Serializer};
 
 use uuid;
 
-#[derive(TaggedID)]
+#[derive(TaggedID, Serialize, Deserialize)]
 pub struct UserID(uuid::Uuid);
 
 pub struct User<'a> {
