@@ -14,6 +14,7 @@ pub struct SeriatimConfig {
     pub allowed_origin: String,
     pub session_domain: String,
     pub database_url: String,
+    pub redis_url: String,
 }
 
 impl SeriatimConfig {
@@ -31,6 +32,7 @@ impl SeriatimConfig {
             allowed_origin: env::var("SERIATIM_ALLOWED_ORIGIN").unwrap(),
             session_domain: env::var("SERIATIM_SESSION_DOMAIN").unwrap(),
             database_url: env::var("DATABASE_URL").unwrap(),
+            redis_url: env::var("REDIS_URL").unwrap(),
         }
     }
 }
@@ -48,6 +50,7 @@ impl fmt::Display for SeriatimConfig {
         writeln!(f, "    => seriatim_fb_secret:      set")?;
         writeln!(f, "    => seriatim_session_domain: {}", self.session_domain)?;
         writeln!(f, "    => seriatim_allowed_origin: {}", self.allowed_origin)?;
-        write!(f, "    => database_url:            set")
+        writeln!(f, "    => database_url:            set")?;
+        write!(f, "    => redis_url:               set")
     }
 }

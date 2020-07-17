@@ -207,7 +207,7 @@ impl<'a> Document<'a> {
                     &p_items,
                     &i,
                     match new_parent_id {
-                        Some(ref npi) => Some(ItemID::from_uuid(**npi.clone())),
+                        Some(ref npi) => Some(npi.clone()),
                         None => None,
                     },
                 )

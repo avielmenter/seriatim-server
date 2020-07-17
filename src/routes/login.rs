@@ -1,6 +1,9 @@
 use config::SeriatimConfig;
 
 use data::db::Connection;
+use data::memory;
+use data::memory::session;
+use data::memory::session::SessionID;
 use data::user::{User, UserID};
 
 use oauth::{LoginMethod, OAuthResponse, OAuthSource};
@@ -51,6 +54,7 @@ fn login_callback<'a>(
     redirect: ReturnURL,
     mut cookies: Cookies,
     con: Connection,
+    redis: memory::redis::Connection,
     cfg: State<SeriatimConfig>,
 ) -> SeriatimResult {
     let callback = get_callback(&cfg, &login_method, false);
@@ -65,9 +69,11 @@ fn login_callback<'a>(
     }?;
 
     let user_id = db_user.get_id();
-    let user_id_cookie = user_id.to_cookie();
+    let session = session::Session::create(redis, &user_id)?;
 
-    cookies.add_private(user_id_cookie);
+    let session_id_cookie = session.session_id.to_cookie();
+    cookies.add_private(session_id_cookie);
+
     Ok(send_success(&ReturnURL { url: redirect.url }))
 }
 
@@ -144,7 +150,7 @@ fn login<'a>(
 #[get("/logout?<url>&<merge>")]
 fn logout(url: String, merge: Option<bool>, mut cookies: Cookies) -> SeriatimResult {
     cookies
-        .get_private(UserID::cookie_name())
+        .get_private(SessionID::cookie_name())
         .map(|c| cookies.remove_private(c));
 
     Ok(send_success(&ReturnURL { url }))

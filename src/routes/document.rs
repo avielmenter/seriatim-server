@@ -2,6 +2,7 @@ use data::category::Category;
 use data::db::Connection;
 use data::document::{Document, DocumentID};
 use data::item::ItemID;
+use data::memory::session::Session;
 use data::schema::{StyleProperty, StyleUnit};
 use data::user;
 
@@ -24,11 +25,11 @@ struct DocumentPermissions {
 }
 
 #[post("/create")]
-fn create_document(connection: Connection, user_id: user::UserID) -> SeriatimResult {
-    let u = user::User::get_by_id(&connection, &user_id)?;
+fn create_document(connection: Connection, session: Session) -> SeriatimResult {
+    let u = user::User::get_by_id(&connection, &session.user_id)?;
     let doc = u.create_document()?;
 
-    Ok(send_success(&doc.serializable(Some(&user_id))?))
+    Ok(send_success(&doc.serializable(Some(&session.user_id))?))
 }
 
 #[options("/<_doc_id>")]
@@ -37,19 +38,16 @@ fn delete_options<'a>(_doc_id: DocumentID) -> rocket::response::Response<'a> {
 }
 
 #[delete("/<doc_id>")]
-fn delete_document(
-    doc_id: DocumentID,
-    connection: Connection,
-    user_id: user::UserID,
-) -> SeriatimResult {
+fn delete_document(doc_id: DocumentID, connection: Connection, session: Session) -> SeriatimResult {
     let mut doc = Document::get_by_id(&connection, &doc_id)?;
+    let user_id = &session.user_id;
 
-    if !doc.is_trashed(&user_id)? && doc.can_be_viewed_by(&user_id) {
-        Category::create(&connection, &doc_id, &user_id, Category::TRASH)?;
-        Ok(send_success(&doc.serializable(Some(&user_id))?))
-    } else if doc.is_owned_by(&user_id) {
+    if !doc.is_trashed(user_id)? && doc.can_be_viewed_by(user_id) {
+        Category::create(&connection, &doc_id, user_id, Category::TRASH)?;
+        Ok(send_success(&doc.serializable(Some(user_id))?))
+    } else if doc.is_owned_by(user_id) {
         doc.delete()?;
-        Ok(send_success(&doc.serializable(Some(&user_id))?))
+        Ok(send_success(&doc.serializable(Some(user_id))?))
     } else {
         Err(Error::InsufficientPermissions)
     }
@@ -70,30 +68,26 @@ fn rename_document(
     doc_id: DocumentID,
     rename: Json<RenameDocumentParams>,
     connection: Connection,
-    user_id: user::UserID,
+    session: Session,
 ) -> SeriatimResult {
     let mut doc = Document::get_by_id(&connection, &doc_id)?;
-    if !doc.can_be_edited_by(&user_id) {
+    if !doc.can_be_edited_by(&session.user_id) {
         return Err(Error::InsufficientPermissions);
     }
 
     doc.rename(&rename.0.name)?;
-    Ok(send_success(&doc.serializable(Some(&user_id))?))
+    Ok(send_success(&doc.serializable(Some(&session.user_id))?))
 }
 
 #[get("/<doc_id>")]
-fn get_document(
-    doc_id: DocumentID,
-    connection: Connection,
-    user_id: user::UserID,
-) -> SeriatimResult {
+fn get_document(doc_id: DocumentID, connection: Connection, session: Session) -> SeriatimResult {
     let doc = Document::get_by_id(&connection, &doc_id)?;
 
-    if doc.can_be_viewed_by(&user_id) {
+    if doc.can_be_viewed_by(&session.user_id) {
         Ok(send_with_permissions(
-            &doc.serialize_with_items(Some(&user_id))?,
+            &doc.serialize_with_items(Some(&session.user_id))?,
             &DocumentPermissions {
-                edit: doc.can_be_edited_by(&user_id),
+                edit: doc.can_be_edited_by(&session.user_id),
             },
         ))
     } else {
@@ -116,16 +110,12 @@ fn get_anonymously(doc_id: DocumentID, connection: Connection) -> SeriatimResult
 }
 
 #[post("/<doc_id>/copy")]
-fn copy_document(
-    doc_id: DocumentID,
-    connection: Connection,
-    user_id: user::UserID,
-) -> SeriatimResult {
+fn copy_document(doc_id: DocumentID, connection: Connection, session: Session) -> SeriatimResult {
     let doc = Document::get_by_id(&connection, &doc_id)?;
 
-    if doc.can_be_viewed_by(&user_id) {
-        let new_doc = doc.copy_to_user(&user_id)?;
-        Ok(send_success(&new_doc.serializable(Some(&user_id))?))
+    if doc.can_be_viewed_by(&session.user_id) {
+        let new_doc = doc.copy_to_user(&session.user_id)?;
+        Ok(send_success(&new_doc.serializable(Some(&session.user_id))?))
     } else {
         Err(Error::InsufficientPermissions)
     }
@@ -247,12 +237,12 @@ fn update_root(doc: &mut Document, subtree: &EditDocumentParams) -> Result<(), E
 fn edit_document(
     doc_id: DocumentID,
     connection: Connection,
-    user_id: user::UserID,
+    session: Session,
     subtree: Json<EditDocumentParams>,
 ) -> SeriatimResult {
     let mut doc = Document::get_by_id(&connection, &doc_id)?;
 
-    if !doc.can_be_edited_by(&user_id) {
+    if !doc.can_be_edited_by(&session.user_id) {
         return Err(Error::InsufficientPermissions);
     }
 
@@ -277,12 +267,12 @@ fn edit_text_options<'a>(_doc_id: DocumentID) -> rocket::response::Response<'a> 
 fn edit_document_text(
     doc_id: DocumentID,
     connection: Connection,
-    user_id: user::UserID,
+    session: Session,
     changes: Json<HashMap<String, String>>,
 ) -> SeriatimResult {
     let mut doc = Document::get_by_id(&connection, &doc_id)?;
 
-    if !doc.can_be_edited_by(&user_id) {
+    if !doc.can_be_edited_by(&session.user_id) {
         Err(Error::InsufficientPermissions)
     } else {
         let mut items = doc.get_items()?;
@@ -317,17 +307,17 @@ fn public_viewability_options<'a>(_doc_id: DocumentID) -> rocket::response::Resp
 fn public_viewability(
     doc_id: DocumentID,
     connection: Connection,
-    user_id: user::UserID,
+    session: Session,
     viewability: Json<DocumentViewabilityParams>,
 ) -> SeriatimResult {
     let mut doc = Document::get_by_id(&connection, &doc_id)?;
 
-    if !doc.is_owned_by(&user_id) {
+    if !doc.is_owned_by(&session.user_id) {
         Err(Error::InsufficientPermissions)
     } else {
         Ok(send_success(
             &doc.set_publicly_viewable(viewability.publicly_viewable)?
-                .serializable(Some(&user_id))?,
+                .serializable(Some(&session.user_id))?,
         ))
     }
 }
@@ -346,16 +336,16 @@ fn category_options<'a>(_doc_id: DocumentID) -> rocket::response::Response<'a> {
 fn add_category(
     doc_id: DocumentID,
     connection: Connection,
-    user_id: user::UserID,
+    session: Session,
     new_category: Json<AddCategoryParams>,
 ) -> SeriatimResult {
     let doc = Document::get_by_id(&connection, &doc_id)?;
 
-    if !doc.can_be_viewed_by(&user_id) {
+    if !doc.can_be_viewed_by(&session.user_id) {
         Err(Error::InsufficientPermissions)
     } else {
-        Category::create(&connection, &doc_id, &user_id, &new_category.name)?;
-        Ok(send_success(&doc.serializable(Some(&user_id))?))
+        Category::create(&connection, &doc_id, &session.user_id, &new_category.name)?;
+        Ok(send_success(&doc.serializable(Some(&session.user_id))?))
     }
 }
 
@@ -371,18 +361,19 @@ fn delete_category_options<'a>(
 fn delete_category(
     doc_id: DocumentID,
     connection: Connection,
-    user_id: user::UserID,
+    session: Session,
     cat_name: String,
 ) -> SeriatimResult {
     let doc = Document::get_by_id(&connection, &doc_id)?;
 
-    if !doc.can_be_viewed_by(&user_id) {
+    if !doc.can_be_viewed_by(&session.user_id) {
         Err(Error::InsufficientPermissions)
     } else {
-        let mut category = Category::get_category(&connection, &doc_id, &user_id, &cat_name)?;
+        let mut category =
+            Category::get_category(&connection, &doc_id, &session.user_id, &cat_name)?;
         category.delete()?;
 
-        Ok(send_success(&doc.serializable(Some(&user_id))?))
+        Ok(send_success(&doc.serializable(Some(&session.user_id))?))
     }
 }
 

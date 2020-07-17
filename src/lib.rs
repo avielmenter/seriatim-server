@@ -8,6 +8,7 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
     let name = &ast.ident;
 
     let gen = quote! {
+        use r2d2_redis;
         use rand;
         use rocket;
         use rocket::outcome::IntoOutcome;
@@ -16,6 +17,10 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
 
         #[allow(dead_code)]
         impl #name {
+            pub fn generate() -> Self {
+                #name(uuid::Uuid::new_v4())
+            }
+
             fn get_salt() -> String {
                 (0..32)
                     .map(|_| format!("{:x}", rand::random::<u8>()))
@@ -64,16 +69,6 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
             }
         }
 
-        impl<'a, 'r> rocket::request::FromRequest<'a, 'r> for #name {
-            type Error = ();
-
-            fn from_request(
-                request: &'a rocket::request::Request<'r>,
-            ) -> rocket::request::Outcome<Self, Self::Error> {
-                Self::from_cookie(&mut request.cookies()).or_forward(())
-            }
-        }
-
         impl<'a> rocket::request::FromParam<'a> for #name {
             type Error = ();
 
@@ -89,6 +84,12 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
                 }?;
 
                 Ok(Self::from_uuid(uuid))
+            }
+        }
+
+        impl std::clone::Clone for #name {
+            fn clone(&self) -> Self {
+                #name(self.0.clone())
             }
         }
 
@@ -118,6 +119,43 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 let uuid = uuid::Uuid::parse_str(&s)?;
                 Ok(Self::from_uuid(uuid))
+            }
+        }
+
+        impl r2d2_redis::redis::ToRedisArgs for #name {
+            fn write_redis_args<W: ?Sized + r2d2_redis::redis::RedisWrite>(&self, out: &mut W) {
+               self.to_string().write_redis_args(out)
+            }
+        }
+        impl r2d2_redis::redis::ToRedisArgs for &#name {
+            fn write_redis_args<W: ?Sized + r2d2_redis::redis::RedisWrite>(&self, out: &mut W) {
+                self.to_string().write_redis_args(out)
+            }
+        }
+
+        impl r2d2_redis::redis::FromRedisValue for #name {
+            fn from_redis_value(v: &r2d2_redis::redis::Value) -> r2d2_redis::redis::RedisResult<Self> {
+                let string_value = String::from_redis_value(v)?;
+
+                let err: r2d2_redis::redis::RedisError =
+                    r2d2_redis::redis::RedisError::from(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Cannot convert the requested data to the specified type.",
+                    ));
+
+                let r = "^".to_string()
+                    + Self::cookie_name()
+                    + r" \( ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) \)";
+                let re_result = regex::Regex::new(&r);
+                if let Ok(re) = re_result {
+                    re.captures(&string_value)
+                        .and_then(|caps| caps.get(1))
+                        .and_then(|cap| uuid::Uuid::parse_str(cap.as_str()).ok())
+                        .and_then(|uuid| Some(Self::from_uuid(uuid)))
+                        .ok_or(err)
+                } else {
+                    Err(err)
+                }
             }
         }
 
@@ -153,4 +191,28 @@ fn impl_tagged_id(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
 pub fn tagged_id(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = syn::parse(input).unwrap();
     impl_tagged_id(&ast)
+}
+
+fn impl_cookie_guard(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
+    let name = &ast.ident;
+
+    let gen = quote! {
+        impl<'a, 'r> rocket::request::FromRequest<'a, 'r> for #name {
+            type Error = ();
+
+            fn from_request(
+                request: &'a rocket::request::Request<'r>,
+            ) -> rocket::request::Outcome<Self, Self::Error> {
+                Self::from_cookie(&mut request.cookies()).or_forward(())
+            }
+        }
+    };
+
+    gen.into()
+}
+
+#[proc_macro_derive(CookieGuard)]
+pub fn cookie_guard(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let ast = syn::parse(input).unwrap();
+    impl_cookie_guard(&ast)
 }

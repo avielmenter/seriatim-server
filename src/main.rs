@@ -7,7 +7,9 @@ extern crate diesel;
 extern crate diesel_derive_enum;
 extern crate dotenv;
 extern crate hmacsha1;
+extern crate r2d2_redis;
 extern crate rand;
+extern crate regex;
 extern crate reqwest;
 #[macro_use]
 extern crate rocket;
@@ -49,8 +51,12 @@ fn main() {
         .to_cors()
         .unwrap();
 
+    let db = data::db::init_pool(&cfg);
+    let redis = data::memory::redis::init_pool(&cfg).unwrap();
+
     rocket::ignite()
-        .manage(data::db::init_pool(&cfg))
+        .manage(db)
+        .manage(redis)
         .manage(cfg)
         .mount("/document", document_routes)
         .mount("/login", login_routes)

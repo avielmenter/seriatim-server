@@ -42,7 +42,7 @@ impl<'a> Style<'a> {
         Style {
             connection,
             data: Data {
-                item_id: (*p_item_id).clone(),
+                item_id: *p_item_id.clone(),
                 property: p_property,
                 value_string: p_value_string,
                 value_number: p_value_number,

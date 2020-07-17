@@ -1,5 +1,7 @@
 use diesel;
 
+use r2d2_redis::redis::RedisError;
+
 use rocket::http::ContentType;
 use rocket::request::Request;
 use rocket::response::{self, Responder, Response};
@@ -15,6 +17,7 @@ pub enum Error {
     NotLoggedIn,
     TooFewLoginMethods,
     DatabaseError(Box<diesel::result::Error>),
+    RedisError(Box<RedisError>),
     OtherError(Box<dyn std::error::Error>),
 }
 
@@ -28,6 +31,7 @@ impl Error {
                 diesel::result::Error::NotFound => "NOT_FOUND",
                 _ => "DATABASE_ERROR",
             },
+            Error::RedisError(_) => "REDIS_ERROR",
             _ => "OTHER_ERROR",
         }
     }
@@ -52,7 +56,8 @@ impl std::fmt::Display for Error {
 			Error::InsufficientPermissions => write!(f, "Insufficient Permissions - you do not have the permissions necessary to perform this action"),
 			Error::NotLoggedIn => write!(f, "Not Logged In - you must be logged in to access this URL"),
 			Error::TooFewLoginMethods => write!(f, "Too Few Login Methods - you can only remove a login method if you have at least one remaining way to log in"),
-			Error::DatabaseError(e) => write!(f, "Database Error - {}", e),
+            Error::DatabaseError(e) => write!(f, "Database Error - {}", e),
+            Error::RedisError(e) => write!(f, "Redis Error - {}", e),
 			Error::OtherError(e) => write!(f, "Other Error - {}", e),
 		}
     }
@@ -61,6 +66,12 @@ impl std::fmt::Display for Error {
 impl std::convert::From<diesel::result::Error> for Error {
     fn from(error: diesel::result::Error) -> Self {
         Error::DatabaseError(Box::new(error))
+    }
+}
+
+impl std::convert::From<RedisError> for Error {
+    fn from(error: RedisError) -> Self {
+        Error::RedisError(Box::new(error))
     }
 }
 

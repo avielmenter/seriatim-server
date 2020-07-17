@@ -1,6 +1,6 @@
 use data::db::Connection;
 use data::document::SerializableDocument;
-use data::user;
+use data::memory::session::Session;
 use data::user::User;
 
 use diesel::result::QueryResult;
@@ -16,19 +16,19 @@ use routes::io::{cors_response, send_success, SeriatimResult};
 use std;
 
 #[get("/current")]
-fn current_user(connection: Connection, user_id: user::UserID) -> SeriatimResult {
-    let u = User::get_by_id(&connection, &user_id)?;
+fn current_user(connection: Connection, session: Session) -> SeriatimResult {
+    let u = User::get_by_id(&connection, &session.user_id)?;
     Ok(send_success(&u))
 }
 
 #[get("/documents")]
-fn list_documents(connection: Connection, user_id: user::UserID) -> SeriatimResult {
-    let u = User::get_by_id(&connection, &user_id)?;
+fn list_documents(connection: Connection, session: Session) -> SeriatimResult {
+    let u = User::get_by_id(&connection, &session.user_id)?;
     let docs = u.get_documents()?;
 
     let serializable_docs = docs
         .iter()
-        .map(|d| d.serializable(Some(&user_id)))
+        .map(|d| d.serializable(Some(&session.user_id)))
         .collect::<QueryResult<Vec<SerializableDocument>>>()?;
 
     Ok(send_success(&serializable_docs))
@@ -47,22 +47,18 @@ fn update_options<'a>() -> rocket::response::Response<'a> {
 #[post("/update", format = "json", data = "<update_params>")]
 fn update_user(
     con: Connection,
-    user_id: user::UserID,
+    session: Session,
     update_params: Json<UpdateUserParams>,
 ) -> SeriatimResult {
-    let mut u = User::get_by_id(&con, &user_id)?;
+    let mut u = User::get_by_id(&con, &session.user_id)?;
     u.update_display_name(&update_params.display_name)?;
 
     Ok(send_success(&u))
 }
 
 #[post("/remove_login/<login_method>")]
-fn remove_login(
-    con: Connection,
-    user_id: user::UserID,
-    login_method: LoginMethod,
-) -> SeriatimResult {
-    let mut u = User::get_by_id(&con, &user_id)?;
+fn remove_login(con: Connection, session: Session, login_method: LoginMethod) -> SeriatimResult {
+    let mut u = User::get_by_id(&con, &session.user_id)?;
 
     if u.count_login_methods() <= 1 {
         Err(Error::TooFewLoginMethods)
