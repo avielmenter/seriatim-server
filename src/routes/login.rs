@@ -106,7 +106,7 @@ fn login_denied<'a>(_login_method: LoginMethod, redirect: ReturnURL) -> Seriatim
 
 #[get("/<login_method>/merge?<oauth_params..>")]
 fn login_merge<'a>(
-    ip_addr: ClientIP,
+    // ip_addr: ClientIP,
     login_method: LoginMethod,
     oauth_params: Form<OAuthResponse>,
     redirect: ReturnURL,
@@ -121,8 +121,7 @@ fn login_merge<'a>(
         None => Err(super::error::Error::NotLoggedIn),
     }?;
 
-    let redirect_session =
-        Session::get_by_id(Rc::new(redis), &redirect_session_id)?.check_ip(&ip_addr.0)?;
+    let redirect_session = Session::get_by_id(Rc::new(redis), &redirect_session_id)?; //.check_ip(&ip_addr.0)?;
 
     let mut merge_into = User::get_by_id(&con, &redirect_session.data.user_id)?;
 

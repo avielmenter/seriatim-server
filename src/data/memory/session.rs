@@ -151,11 +151,10 @@ impl<'a, 'r> rocket::request::FromRequest<'a, 'r> for Session {
 
         SessionID::from_cookie(&mut request.cookies())
             .and_then(move |session_id| {
-                let ip = request.client_ip()?;
-                Session::get_by_id(con, &session_id)
-                    .ok()?
-                    .check_ip(&ip)
-                    .ok()
+                // let ip = request.client_ip()?;
+                Session::get_by_id(con, &session_id).ok() //?
+                                                          // .check_ip(&ip)
+                                                          // .ok()
             })
             .or_forward(())
     }
