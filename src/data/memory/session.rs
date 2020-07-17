@@ -119,7 +119,7 @@ impl Session {
             .into_iter()
             .enumerate()
             .filter_map(|(i, mut session)| {
-                if keep > 0 && i < num_sessions - keep {
+                if keep > 0 && num_sessions > keep && i < num_sessions - keep {
                     Some(session.delete())
                 } else {
                     None
